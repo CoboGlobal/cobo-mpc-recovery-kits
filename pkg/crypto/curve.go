@@ -9,8 +9,8 @@ import (
 type CurveType int32
 
 const (
-	SECP256K1 CurveType = 0
-	ED25519   CurveType = 1
+	SECP256K1 CurveType = 1
+	ED25519   CurveType = 2
 )
 
 var CurveNameType = map[string]CurveType{

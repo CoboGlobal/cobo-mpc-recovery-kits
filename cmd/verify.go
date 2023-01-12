@@ -59,6 +59,7 @@ func verifyShare() {
 		log.Printf("Verify all group parameters passed!")
 
 		for i, verifyGroup := range verifyGroups {
+			log.Printf("Start to compare with group (no.%v) parameters ...", i+1)
 			if err := checkMultiGroupsParam(verifyGroup, group); err != nil {
 				log.Fatalln("Multi groups param check  error:", err)
 			}

@@ -31,6 +31,9 @@ func NewKDF(length int, iterations int, hash crypto.Hash) *KDF {
 }
 
 func (kdf *KDF) PBKDF2(passphrase string) []byte {
+	if kdf == nil || kdf.HashType == 0 {
+		return nil
+	}
 	salt, err := utils.Decode(kdf.Salt)
 	if err != nil {
 		return nil

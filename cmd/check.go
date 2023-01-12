@@ -29,7 +29,7 @@ func checkGroupParam(groupID string, group *tss.Group) error {
 		return fmt.Errorf("group param root extended public key nil")
 	}
 	if group.GroupInfo.ChainCode == "" {
-		return fmt.Errorf("group param root extended public key nil")
+		return fmt.Errorf("group param chaincode nil")
 	}
 	if crypto.CurveNameType[group.GroupInfo.Curve] != crypto.SECP256K1 &&
 		crypto.CurveNameType[group.GroupInfo.Curve] != crypto.ED25519 {
@@ -39,7 +39,7 @@ func checkGroupParam(groupID string, group *tss.Group) error {
 		return fmt.Errorf("group param threshold not supported")
 	}
 	if group.GroupInfo.Threshold > int32(len(group.GroupInfo.Participants)) {
-		return fmt.Errorf("group param threshold participants less than threshold")
+		return fmt.Errorf("group param participants less than threshold")
 	}
 
 	if group.ShareInfo.NodeID == "" {
