@@ -30,7 +30,6 @@ type Wallet struct {
 	ChildPubKey  string
 }
 
-//nolint:cyclop
 func recoveryPrivateKey() *bip32.Key {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
@@ -109,12 +108,12 @@ func recoveryPrivateKey() *bip32.Key {
 		IsPrivate:   true,
 	}
 	if ShowRootPrivate {
-		log.Println("Reconstruct root private key:", utils.Encode(privateKey.D.Bytes()))
-		log.Println("Reconstruct root extended private key:", extPrivateKey.String())
+		log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
+		log.Println("Reconstructed root extended private key:", extPrivateKey.String())
 	}
-	log.Println("Reconstruct root extended public key:", extPrivateKey.PublicKey().String())
+	log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
 	if recoveryGroup.GroupInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-		log.Fatalf("Reconstruct root extended public key mismatch")
+		log.Fatalf("Reconstructed root extended public key mismatch")
 	}
 	return extPrivateKey
 }
@@ -171,10 +170,10 @@ func derive(extendedKey *bip32.Key, path string) (deriveKey *bip32.Key, err erro
 		}
 	}
 	if deriveKey.IsPrivate {
-		log.Printf("Path: %v derive child private key: %v", path, utils.Encode(deriveKey.Key))
-		log.Printf("Path: %v derive child extended private key: %v", path, deriveKey.String())
+		log.Printf("Path: %v derived child private key: %v", path, utils.Encode(deriveKey.Key))
+		log.Printf("Path: %v derived child extended private key: %v", path, deriveKey.String())
 	}
-	log.Printf("Path: %v derive child extended public key: %v", path, deriveKey.PublicKey().String())
+	log.Printf("Path: %v derived child extended public key: %v", path, deriveKey.PublicKey().String())
 	return
 }
 
@@ -214,7 +213,6 @@ func getPath(path string) ([]uint32, error) {
 	return indexes, nil
 }
 
-//nolint:cyclop
 func deriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string) error {
 	readFile, err := os.Open(inputFile)
 	if err != nil {
@@ -277,12 +275,12 @@ func deriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string)
 		}
 		childPubKey := strings.TrimSpace(strings.ReplaceAll(wallet.ChildPubKey, " ", ""))
 		if childPubKey != "" && pubExt != "" && childPubKey != pubExt {
-			log.Warnf("Derive child public key mismatch, wallet info: %v", wallet)
+			log.Warnf("Derived child public key mismatch, wallet info: %v", wallet)
 		}
 		// write to csv file
 		writeLine := append(line, prv, prvExt, pubExt)
 		if err := writer.Write(writeLine); err != nil {
-			return fmt.Errorf("write derive keys error: %v", err)
+			return fmt.Errorf("write derived keys error: %v", err)
 		}
 		writer.Flush()
 	}

@@ -139,7 +139,7 @@ linters:
     - bidichk
     - bodyclose
     - containedctx
-    - cyclop
+    # - cyclop
     # - deadcode
     - decorder
     - depguard

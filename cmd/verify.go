@@ -22,7 +22,6 @@ var verifyCmd = &cobra.Command{
 	},
 }
 
-//nolint:cyclop
 func verifyShare() {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
@@ -66,7 +65,7 @@ func verifyShare() {
 			if err := checkMultiGroupsParticipants(verifyGroup, group); err != nil {
 				log.Fatalln("Multi groups participants check error:", err)
 			}
-			log.Printf("Compare with no.%v group parameters passed!", i+1)
+			log.Printf("Compare with group (no.%v) parameters passed!", i+1)
 		}
 		verifyGroups = append(verifyGroups, group)
 

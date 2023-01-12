@@ -39,7 +39,6 @@ func CreateECDSAPrivateKey(curve elliptic.Curve, d *big.Int) *ecdsa.PrivateKey {
 	return prv
 }
 
-//nolint:cyclop
 func ParseECDSAPublicKey(public string) (x, y *big.Int, err error) {
 	shareBytes, err := utils.Decode(public)
 	if err != nil {

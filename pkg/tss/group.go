@@ -102,7 +102,6 @@ func (s *ShareInfo) GenerateECDSAShare(key string) (*ECDSAShare, error) {
 	return secret, nil
 }
 
-//nolint:cyclop
 func (s *ShareInfo) VerifySharePublicKey(curveType crypto.CurveType, key string) error {
 	if s == nil || key == "" {
 		return fmt.Errorf("input error")
@@ -130,7 +129,7 @@ func (s *ShareInfo) VerifySharePublicKey(curveType crypto.CurveType, key string)
 
 		log.Printf("Derived share public key: 0x04%x%x\n", prvKey.PublicKey.X.Bytes(), prvKey.PublicKey.Y.Bytes())
 		if !bytes.Equal(prvKey.PublicKey.X.Bytes(), x.Bytes()) || !bytes.Equal(prvKey.PublicKey.Y.Bytes(), y.Bytes()) {
-			return fmt.Errorf("share public key differ, verify share info failed")
+			return fmt.Errorf("derived share public key differ, verify share info failed")
 		}
 	} else if curveType == crypto.ED25519 {
 		return fmt.Errorf("not support curve type ed25519 now")
@@ -165,6 +164,9 @@ func (g *GroupInfo) VerifyReconstructPubKey() error {
 	}
 	threshold := int(g.Threshold)
 	parts := g.Participants
+	if threshold < 1 || len(parts) == 0 {
+		return fmt.Errorf("number of participants or threshold error")
+	}
 	if threshold > len(parts) {
 		return fmt.Errorf("number of participants %v parse from files less than threshold %v", len(parts), threshold)
 	}
@@ -172,33 +174,48 @@ func (g *GroupInfo) VerifyReconstructPubKey() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse chaincode: %v", err)
 	}
-	// selectParts := make(ParticipantsInfo, 0)
-	selectParts := parts // TODO
-
 	curveType := crypto.CurveNameType[g.Curve]
-	if curveType == crypto.SECP256K1 {
-		pub, err := selectParts.ReconstructECDSAPubKey(threshold)
-		if err != nil {
-			return fmt.Errorf("reconstruct ECDSA public Key error: %v", err)
-		}
-		extPubKey := &bip32.Key{
-			Version:     bip32.PublicWalletVersion,
-			ChainCode:   chainCode,
-			Key:         crypto.CompressPubKey(pub),
-			Depth:       0x0,
-			ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
-			FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
-			IsPrivate:   false,
-		}
-		log.Println("Reconstruct root extended public key:", extPubKey.PublicKey().String())
+	fixedParts := make(ParticipantsInfo, 0)
+	fixedIndexes := make([]int, 0)
+	for i := 0; i < threshold-1; i++ {
+		fixedParts = append(fixedParts, parts[i])
+		fixedIndexes = append(fixedIndexes, i)
+	}
+	for i := threshold - 1; i < len(parts); i++ {
+		selectParts := fixedParts
+		selectParts = append(selectParts, parts[i])
+		selectIndexes := fixedIndexes
+		selectIndexes = append(selectIndexes, i)
 
-		if g.RootExtendedPubKey != extPubKey.PublicKey().String() {
-			return fmt.Errorf("reconstruct root public key differ, verify root public key failed")
+		indexesStr := ""
+		for _, index := range selectIndexes {
+			indexesStr = indexesStr + fmt.Sprintf("(no.%v) ", index+1)
 		}
-	} else if curveType == crypto.ED25519 {
-		return fmt.Errorf("not support curve type ed25519 now")
-	} else {
-		return fmt.Errorf("not support curve type: %v", curveType)
+		log.Printf("Use participants %v to reconstruct root extended public key ...", indexesStr)
+		if curveType == crypto.SECP256K1 {
+			pub, err := selectParts.ReconstructECDSAPubKey(threshold)
+			if err != nil {
+				return fmt.Errorf("reconstruct ECDSA public Key error: %v", err)
+			}
+			extPubKey := &bip32.Key{
+				Version:     bip32.PublicWalletVersion,
+				ChainCode:   chainCode,
+				Key:         crypto.CompressPubKey(pub),
+				Depth:       0x0,
+				ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
+				FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
+				IsPrivate:   false,
+			}
+			log.Println("Reconstructed root extended public key:", extPubKey.PublicKey().String())
+
+			if g.RootExtendedPubKey != extPubKey.PublicKey().String() {
+				return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
+			}
+		} else if curveType == crypto.ED25519 {
+			return fmt.Errorf("not support curve type ed25519 now")
+		} else {
+			return fmt.Errorf("not support curve type: %v", curveType)
+		}
 	}
 	return nil
 }

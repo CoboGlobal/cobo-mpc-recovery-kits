@@ -56,7 +56,6 @@ func TestReconstructPrivateKey(t *testing.T) {
 	}
 }
 
-//nolint:cyclop
 func TestReconstructPublicKey(t *testing.T) {
 	sharePubs := make(ECDSASharePubs, 0)
 	id1 := new(big.Int)

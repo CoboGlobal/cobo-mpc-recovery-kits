@@ -14,7 +14,6 @@ type (
 	ECDSASharePubs []*ECDSASharePub
 )
 
-//nolint:cyclop
 func (shares ECDSASharePubs) ReconstructKey(threshold int) (*ecdsa.PublicKey, error) {
 	if shares == nil || threshold < 1 {
 		return nil, fmt.Errorf("input error")

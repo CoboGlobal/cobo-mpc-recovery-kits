@@ -15,7 +15,6 @@ func checkFlags() error {
 	return nil
 }
 
-//nolint:cyclop
 func checkGroupParam(groupID string, group *tss.Group) error {
 	if groupID == "" || group == nil || group.GroupInfo == nil || group.ShareInfo == nil {
 		return fmt.Errorf("group param nil")
@@ -61,7 +60,7 @@ func checkGroupParam(groupID string, group *tss.Group) error {
 	return nil
 }
 
-//nolint:gocognit,cyclop
+//nolint:gocognit
 func checkGroupParticipants(group *tss.Group) error {
 	parts := group.GroupInfo.Participants
 	if int(group.GroupInfo.Threshold) > len(parts) {
@@ -84,13 +83,13 @@ func checkGroupParticipants(group *tss.Group) error {
 				continue
 			}
 			if part.NodeID == parts[j].NodeID {
-				return fmt.Errorf("participants (no.%v and no.%v) node ids should be different", i+1, j+1)
+				return fmt.Errorf("participants (no.%v) and (no.%v) node ids should be different", i+1, j+1)
 			}
 			if part.ShareID == parts[j].ShareID {
-				return fmt.Errorf("participants (no.%v and no.%v) share ids should be different", i+1, j+1)
+				return fmt.Errorf("participants (no.%v) and (no.%v) share ids should be different", i+1, j+1)
 			}
 			if part.SharePubKey == parts[j].SharePubKey {
-				return fmt.Errorf("participants (no.%v and no.%v) share public keys should be different", i+1, j+1)
+				return fmt.Errorf("participants (no.%v) and (no.%v) share public keys should be different", i+1, j+1)
 			}
 		}
 		if part.NodeID == group.ShareInfo.NodeID {
