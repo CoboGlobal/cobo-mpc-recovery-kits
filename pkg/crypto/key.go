@@ -1,6 +1,5 @@
 package crypto
 
-import "C"
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -8,7 +7,7 @@ import (
 	"math/big"
 
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 func CompressPubKey(pubKey *ecdsa.PublicKey) []byte {
@@ -21,7 +20,12 @@ func CompressPubKey(pubKey *ecdsa.PublicKey) []byte {
 
 func DecompressPubKey(curveType CurveType, pubKey []byte) (x, y *big.Int) {
 	if curveType == SECP256K1 {
-		return secp256k1.DecompressPubkey(pubKey)
+		key, err := secp.ParsePubKey(pubKey)
+		if err != nil {
+			return nil, nil
+		}
+		x, y = UnmarshalPubKey(S256(), key.SerializeUncompressed())
+		return
 	} else {
 		return nil, nil
 	}

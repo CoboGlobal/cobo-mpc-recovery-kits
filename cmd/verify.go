@@ -87,8 +87,8 @@ func verifyShare() {
 			log.Fatalln("Verify share public key failed:", err)
 		}
 		log.Printf("Verify to derive share public key from share secret passed!")
-		log.Printf("Verfiy group recovery file %v passed!", groupFile)
+		log.Printf("Verify group recovery file %v passed!", groupFile)
 		log.Printf("=======================================")
 	}
-	log.Printf("Verfiy all group recovery files passed!")
+	log.Printf("Verify all group recovery files passed!")
 }

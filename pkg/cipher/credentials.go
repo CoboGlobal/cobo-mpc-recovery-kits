@@ -10,7 +10,7 @@ import (
 
 func Credentials(prompt string) (string, error) {
 	fmt.Print(prompt)
-	bytePassword, err := term.ReadPassword(syscall.Stdin)
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin)) //nolint:unconvert
 	fmt.Print("\n")
 	if err != nil {
 		return "", fmt.Errorf("error read password from terminal: %w", err)

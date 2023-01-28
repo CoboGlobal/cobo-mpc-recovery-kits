@@ -3,7 +3,7 @@ package crypto
 import (
 	"crypto/elliptic"
 
-	s256k1 "github.com/btcsuite/btcd/btcec/v2"
+	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 type CurveType int32
@@ -20,5 +20,5 @@ var CurveNameType = map[string]CurveType{
 
 // S256 secp256k1.
 func S256() elliptic.Curve {
-	return s256k1.S256()
+	return secp.S256()
 }
