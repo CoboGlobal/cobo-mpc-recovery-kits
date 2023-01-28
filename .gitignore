@@ -2,6 +2,7 @@
 build/
 recovery/
 vendor/
+dist/
 .DS_Store
 *.dat
 *.csv

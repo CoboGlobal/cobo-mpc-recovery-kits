@@ -200,7 +200,7 @@ func getPath(path string) ([]uint32, error) {
 			if err != nil {
 				return nil, err
 			}
-			i = uint32(1<<31 + num)
+			i = 1<<31 + uint32(num)
 		} else {
 			num, err := strconv.Atoi(segment)
 			if err != nil {
