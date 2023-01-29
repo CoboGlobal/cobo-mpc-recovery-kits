@@ -1,6 +1,6 @@
-.PHONY: recovery-tool test clean
+.PHONY: tool test clean
 
-recovery-tool:
+tool:
 	go build -o build/cobo-mpc-recovery-tool main.go
 
 test:
