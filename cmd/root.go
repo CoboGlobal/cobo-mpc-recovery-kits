@@ -23,7 +23,7 @@ func InitCmd() {
 
 func AddFlag() {
 	rootCmd.PersistentFlags().StringSliceVar(&GroupFiles, "group-recovery-files", []string{},
-		"TSS group recovery files, such as recovery/tss-group-id-node-1-time,recovery/tss-group-id-node-1-time")
+		"TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2")
 	rootCmd.MarkPersistentFlagRequired("group-recovery-files")
 	rootCmd.PersistentFlags().StringVar(&GroupID, "group-id", "", "recovery group id")
 	rootCmd.MarkPersistentFlagRequired("group-id")
