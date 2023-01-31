@@ -9,6 +9,7 @@ import (
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/tss"
+	"github.com/cobo/cobo-mpc-recovery-kits/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,7 @@ var verifyCmd = &cobra.Command{
 	Short: "verify command to reconstruct root public key by share public keys and verify TSS group recovery files parameters",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Version: " + version.TextVersion() + "\n")
 		verifyShare()
 	},
 }
