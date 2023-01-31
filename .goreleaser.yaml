@@ -1,2 +1,8 @@
 builds:
   - binary: cobo-mpc-recovery-tool
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
