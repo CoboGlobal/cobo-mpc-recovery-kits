@@ -1,5 +1,7 @@
 builds:
-  - binary: cobo-mpc-recovery-tool
+  - env:
+      - CGO_ENABLED=0
+    binary: cobo-mpc-recovery-tool
     goos:
       - linux
       - darwin
