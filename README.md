@@ -2,6 +2,7 @@
 
 Cobo MPC WaaS provides `Hard Key Recovery` for disaster recovery. The tool named `cobo-mpc-recovery-tool`
 in this repository can reconstruct the MPC private key that corresponds to the Cobo MPC wallet.
+
 Binary archives are published at https://github.com/CoboCustody/cobo-mpc-recovery-kits/releases
 
 ## Building the source
