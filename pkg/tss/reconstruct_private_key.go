@@ -5,17 +5,19 @@ import (
 	"crypto/elliptic"
 	"fmt"
 	"math/big"
+
+	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
 )
 
 type (
-	ECDSAShare struct {
+	Share struct {
 		ID, Xi *big.Int
 	}
-	ECDSAShares []*ECDSAShare
+	Shares []*Share
 )
 
 //nolint:unparam
-func (shares ECDSAShares) reconstruct(curve elliptic.Curve) (*big.Int, error) {
+func (shares Shares) reconstruct(curve elliptic.Curve) (*big.Int, error) {
 	var secret *big.Int
 	n := curve.Params().N
 
@@ -58,7 +60,7 @@ func (shares ECDSAShares) reconstruct(curve elliptic.Curve) (*big.Int, error) {
 	return secret, nil
 }
 
-func (shares ECDSAShares) ReconstructKey(threshold int, curve elliptic.Curve) (*ecdsa.PrivateKey, error) {
+func (shares Shares) ReconstructECDSAKey(threshold int, curve elliptic.Curve) (*ecdsa.PrivateKey, error) {
 	if shares == nil || threshold < 1 {
 		return nil, fmt.Errorf("input error")
 	}
@@ -70,15 +72,5 @@ func (shares ECDSAShares) ReconstructKey(threshold int, curve elliptic.Curve) (*
 		return nil, err
 	}
 
-	x, y := curve.ScalarBaseMult(secret.Bytes())
-	privateKey := &ecdsa.PrivateKey{
-		D: secret,
-		PublicKey: ecdsa.PublicKey{
-			Curve: curve,
-			X:     x,
-			Y:     y,
-		},
-	}
-
-	return privateKey, nil
+	return crypto.CreateECDSAPrivateKey(curve, secret), nil
 }

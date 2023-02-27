@@ -22,7 +22,7 @@ func checkGroupParam(groupID string, group *tss.Group) error {
 	if groupID != group.GroupInfo.ID {
 		return fmt.Errorf("group id mismatch")
 	}
-	if group.GroupInfo.Type != 1 {
+	if group.GroupInfo.Type != 1 && group.GroupInfo.Type != 2 {
 		return fmt.Errorf("group param type not supported")
 	}
 	if group.GroupInfo.RootExtendedPubKey == "" {

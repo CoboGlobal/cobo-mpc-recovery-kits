@@ -38,7 +38,7 @@ func recoveryPrivateKey() *bip32.Key {
 		log.Fatal("nil group ID")
 	}
 	recoveryGroups := make([]*tss.Group, 0)
-	shares := make(tss.ECDSAShares, 0)
+	shares := make(tss.Shares, 0)
 
 	for _, groupFile := range GroupFiles {
 		_, err := os.Stat(groupFile)
@@ -72,7 +72,7 @@ func recoveryPrivateKey() *bip32.Key {
 		if err != nil {
 			log.Fatalln("Credentials error:", err)
 		}
-		share, err := group.ShareInfo.GenerateECDSAShare(key)
+		share, err := group.ShareInfo.GenerateShare(key)
 		if err != nil {
 			log.Fatalln("Group generate share error:", err)
 		}
@@ -87,7 +87,7 @@ func recoveryPrivateKey() *bip32.Key {
 		log.Fatalf("Number of groups parse from files less than threshold %v", threshold)
 	}
 
-	privateKey, err := shares.ReconstructKey(int(threshold), crypto.S256())
+	privateKey, err := shares.ReconstructECDSAKey(int(threshold), crypto.S256())
 	if err != nil {
 		log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
 	}

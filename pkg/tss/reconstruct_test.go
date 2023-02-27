@@ -10,7 +10,7 @@ import (
 )
 
 func TestReconstructPrivateKey(t *testing.T) {
-	shares := make(ECDSAShares, 0)
+	shares := make(Shares, 0)
 	id1 := new(big.Int)
 	id1, ok := id1.SetString("c5218a708d35aa726bc5c4cf3712a2036c2245a0e996d201e4e661ab598bdf36", 16)
 	if !ok {
@@ -37,17 +37,17 @@ func TestReconstructPrivateKey(t *testing.T) {
 		t.Fatalf("d parse error")
 	}
 
-	share1 := &ECDSAShare{
+	share1 := &Share{
 		Xi: xi1,
 		ID: id1,
 	}
-	share2 := &ECDSAShare{
+	share2 := &Share{
 		Xi: xi2,
 		ID: id2,
 	}
 	shares = append(shares, share1)
 	shares = append(shares, share2)
-	private, err := shares.ReconstructKey(2, crypto.S256())
+	private, err := shares.ReconstructECDSAKey(2, crypto.S256())
 	if err != nil {
 		t.Fatalf("reconstructKey failed: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestReconstructPrivateKey(t *testing.T) {
 }
 
 func TestReconstructPublicKey(t *testing.T) {
-	sharePubs := make(ECDSASharePubs, 0)
+	sharePubs := make(SharePubs, 0)
 	id1 := new(big.Int)
 	id1, ok := id1.SetString("c5218a708d35aa726bc5c4cf3712a2036c2245a0e996d201e4e661ab598bdf36", 16)
 	if !ok {
@@ -111,11 +111,11 @@ func TestReconstructPublicKey(t *testing.T) {
 		t.Fatalf("y parse error")
 	}
 
-	sharePub1 := &ECDSASharePub{
+	sharePub1 := &SharePub{
 		ID:       id1,
 		SharePub: pub1,
 	}
-	sharePub2 := &ECDSASharePub{
+	sharePub2 := &SharePub{
 		ID:       id2,
 		SharePub: pub2,
 	}
