@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/tss"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
 	log "github.com/sirupsen/logrus"
@@ -30,7 +29,7 @@ type Wallet struct {
 	ChildPubKey  string
 }
 
-func recoveryPrivateKey() *bip32.Key {
+func recoveryPrivateKey() {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
 	}
@@ -87,45 +86,20 @@ func recoveryPrivateKey() *bip32.Key {
 		log.Fatalf("Number of groups parse from files less than threshold %v", threshold)
 	}
 
-	privateKey, err := shares.ReconstructECDSAKey(int(threshold), crypto.S256())
+	err := recoveryGroup.GroupInfo.VerifyReconstructPrivateKey(shares, ShowRootPrivate)
 	if err != nil {
-		log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
+		log.Fatal(err)
 	}
-
-	chainCode, err := utils.Decode(recoveryGroup.GroupInfo.ChainCode)
-	if err != nil {
-		log.Fatalf("TSS group recovery failed to parse chaincode: %v", err)
-	}
-
-	// Create root extended private key
-	extPrivateKey := &bip32.Key{
-		Version:     bip32.PrivateWalletVersion,
-		ChainCode:   chainCode,
-		Key:         privateKey.D.Bytes(),
-		Depth:       0x0,
-		ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
-		FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
-		IsPrivate:   true,
-	}
-	if ShowRootPrivate {
-		log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
-		log.Println("Reconstructed root extended private key:", extPrivateKey.String())
-	}
-	log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-	if recoveryGroup.GroupInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-		log.Fatalf("Reconstructed root extended public key mismatch")
-	}
-	return extPrivateKey
 }
 
-func deriveKey(key *bip32.Key) {
+func DeriveKey(key *bip32.Key) {
 	if key == nil {
 		log.Fatal("no extended key input")
 	}
 	// parse path
 	if len(Paths) > 0 {
 		for _, path := range Paths {
-			if _, err := derive(key, path); err != nil {
+			if _, err := Derive(key, path); err != nil {
 				log.Fatalf("Derive path %v error: %v", path, err)
 			}
 		}
@@ -148,18 +122,18 @@ func deriveKey(key *bip32.Key) {
 	}
 
 	log.Printf("Derive keys from %v to %v:", Csv, CsvOutputFile)
-	if err := deriveKeyInCSV(key, Csv, CsvOutputFile); err != nil {
+	if err := DeriveKeyInCSV(key, Csv, CsvOutputFile); err != nil {
 		log.Fatalf("Derive keys in csv file failed: %v", err)
 	}
 }
 
-func derive(extendedKey *bip32.Key, path string) (deriveKey *bip32.Key, err error) {
+func Derive(extendedKey *bip32.Key, path string) (deriveKey *bip32.Key, err error) {
 	if path == "" {
 		err = fmt.Errorf("path is nil")
 		return
 	}
 	deriveKey = extendedKey
-	indexes, err := getPath(path)
+	indexes, err := GetPath(path)
 	if err != nil {
 		return
 	}
@@ -177,7 +151,7 @@ func derive(extendedKey *bip32.Key, path string) (deriveKey *bip32.Key, err erro
 	return
 }
 
-func getPath(path string) ([]uint32, error) {
+func GetPath(path string) ([]uint32, error) {
 	path = strings.TrimSpace(strings.ReplaceAll(path, " ", ""))
 	path = strings.TrimPrefix(path, "m")
 	path = strings.TrimPrefix(path, "/m")
@@ -213,7 +187,7 @@ func getPath(path string) ([]uint32, error) {
 	return indexes, nil
 }
 
-func deriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string) error {
+func DeriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string) error {
 	readFile, err := os.Open(inputFile)
 	if err != nil {
 		return fmt.Errorf("open %v failed: %v", inputFile, err)
@@ -259,7 +233,7 @@ func deriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string)
 			HDPath:       line[5],
 			ChildPubKey:  line[6],
 		}
-		deriveKey, err := derive(extendedKey, wallet.HDPath)
+		deriveKey, err := Derive(extendedKey, wallet.HDPath)
 		if err != nil {
 			log.Errorf("Derive error: %v, wallet info: %v", err, wallet)
 		}

@@ -73,7 +73,7 @@ func verifyShare() {
 		verifyGroups = append(verifyGroups, group)
 
 		log.Printf("Start to reconstruct root public key ...")
-		if err := group.GroupInfo.VerifyReconstructPubKey(); err != nil {
+		if err := group.GroupInfo.VerifyReconstructPublicKey(); err != nil {
 			log.Fatalln("Verify root public key error:", err)
 		}
 		log.Printf("Verify to reconstruct root public key passed!")

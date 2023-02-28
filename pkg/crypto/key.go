@@ -83,7 +83,7 @@ func CreateEDDSAPrivateKey(d *big.Int) (*edwards.PrivateKey, error) {
 	return prv, err
 }
 
-func CreateExtendedPubKey(curveType CurveType, chaincode []byte, pub *ecdsa.PublicKey) (string, error) {
+func CreateExtendedPublicKey(curveType CurveType, chaincode []byte, pub *ecdsa.PublicKey) (*bip32.Key, error) {
 	extPubKey := &bip32.Key{
 		ChainCode:   chaincode,
 		Depth:       0x0,
@@ -100,7 +100,20 @@ func CreateExtendedPubKey(curveType CurveType, chaincode []byte, pub *ecdsa.Publ
 		extPubKey.Version = EDDSAHDPublicKeyID[:]
 		extPubKey.Key = SerializeEDDSAPubKey(edPubKey)
 	default:
-		return "", fmt.Errorf("not support curve type: %v", curveType)
+		return nil, fmt.Errorf("not support curve type: %v", curveType)
 	}
-	return extPubKey.String(), nil
+	return extPubKey, nil
+}
+
+func CreateECDSAExtendedPrivateKey(chaincode []byte, private *ecdsa.PrivateKey) *bip32.Key {
+	extPrivateKey := &bip32.Key{
+		Version:     bip32.PrivateWalletVersion,
+		ChainCode:   chaincode,
+		Key:         private.D.Bytes(),
+		Depth:       0x0,
+		ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
+		FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
+		IsPrivate:   true,
+	}
+	return extPrivateKey
 }
