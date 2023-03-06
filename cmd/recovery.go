@@ -127,11 +127,11 @@ func ReconstructAndDerivePrivate(gInfo *tss.GroupInfo, shares tss.Shares) error 
 		if err != nil {
 			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
 		}
+		extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)
 		if ShowRootPrivate {
 			log.Println("Reconstructed root private key:", utils.Encode(privateKey.GetD().Bytes()))
+			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
 		}
-
-		extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)
 		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
 		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
 			log.Fatalf("reconstructed root extended public key mismatch")
@@ -298,8 +298,8 @@ func DeriveKeyInCSV(key interface{}, inputFile string, outputFile string) error 
 			if crypto.CurveNameType[wallet.AddressInfo.Curve] == crypto.SECP256K1 {
 				deriveKey, err := Derive(key, wallet.AddressInfo.HDPath)
 				if err != nil {
-					log.Errorf("Derive error: %v, wallet info: %v", err, wallet)
-					return err
+					log.Errorf("Derive error: %v, address info: %v", err, wallet.AddressInfo)
+					break
 				}
 				k, ok := deriveKey.(*bip32.Key)
 				if !ok {
@@ -316,8 +316,8 @@ func DeriveKeyInCSV(key interface{}, inputFile string, outputFile string) error 
 			if crypto.CurveNameType[wallet.AddressInfo.Curve] == crypto.ED25519 {
 				deriveKey, err := Derive(key, wallet.AddressInfo.HDPath)
 				if err != nil {
-					log.Errorf("Derive error: %v, wallet info: %v", err, wallet)
-					return err
+					log.Errorf("Derive error: %v, address info: %v", err, wallet.AddressInfo)
+					break
 				}
 				k, ok := deriveKey.(*crypto.EDDSAExtendedKey)
 				if !ok {
@@ -335,7 +335,7 @@ func DeriveKeyInCSV(key interface{}, inputFile string, outputFile string) error 
 
 		childPubKey := strings.TrimSpace(strings.ReplaceAll(wallet.AddressInfo.ChildPubKey, " ", ""))
 		if childPubKey != "" && pubExt != "" && childPubKey != pubExt {
-			log.Warnf("Derived child public key mismatch, wallet info: %v", wallet)
+			log.Warnf("Derived child public key mismatch, address info: %v", wallet.AddressInfo)
 		}
 
 		// write to csv file

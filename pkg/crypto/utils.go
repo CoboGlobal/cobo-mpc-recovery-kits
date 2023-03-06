@@ -105,8 +105,8 @@ func addPrivateKeys(curve elliptic.Curve, key1 []byte, key2 []byte) []byte {
 
 	b := key1Int.Bytes()
 	if len(b) < 32 {
-		extra := make([]byte, 0, 32-len(b))
-		b = append(extra, b...)
+		extra := make([]byte, 32-len(b))
+		b = append(extra, b...) //nolint:makezero
 	}
 	return b
 }

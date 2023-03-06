@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/edwards/v2"
@@ -63,13 +64,14 @@ func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExt
 	}
 	if isPrivate {
 		if len(key) < 32 {
-			extra := make([]byte, 0, 32-len(key))
-			key = append(extra, key...)
+			extra := make([]byte, 32-len(key))
+			key = append(extra, key...) //nolint:makezero
 		}
 		extkey.Version = EDDSAHDPrivateKeyID[:]
 		extkey.Key = key
 	} else {
 		extkey.Version = EDDSAHDPublicKeyID[:]
+		extkey.Key = key
 	}
 	return extkey
 }
@@ -251,12 +253,14 @@ func Deserialize(data []byte) (*EDDSAExtendedKey, error) {
 	key.ChildNumber = data[9:13]
 	key.ChainCode = data[13:45]
 
-	if data[45] == byte(0) {
+	if bytes.Equal(key.Version, EDDSAHDPrivateKeyID[:]) {
 		key.IsPrivate = true
 		key.Key = data[46:78]
-	} else {
+	} else if bytes.Equal(key.Version, EDDSAHDPublicKeyID[:]) {
 		key.IsPrivate = false
 		key.Key = data[45:78]
+	} else {
+		return nil, fmt.Errorf("invalid EDDSA HD key id")
 	}
 
 	// validate checksum
