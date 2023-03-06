@@ -55,7 +55,6 @@ type EDDSAExtendedKey struct {
 // NewEDDSAExtendedKey creates a new extended key.
 func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExtendedKey {
 	extkey := &EDDSAExtendedKey{
-		Key:         key,
 		ChainCode:   chainCode,
 		Depth:       0x0,
 		ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
@@ -63,7 +62,12 @@ func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExt
 		IsPrivate:   isPrivate,
 	}
 	if isPrivate {
+		if len(key) < 32 {
+			extra := make([]byte, 0, 32-len(key))
+			key = append(extra, key...)
+		}
 		extkey.Version = EDDSAHDPrivateKeyID[:]
+		extkey.Key = key
 	} else {
 		extkey.Version = EDDSAHDPublicKeyID[:]
 	}
@@ -72,7 +76,7 @@ func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExt
 
 // NewChildKey derives a child key from a given parent as outlined by bip32.
 func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, error) {
-	// Fail early if trying to create hardned child from public key
+	// Fail early if trying to create hardened child from public key
 	if !key.IsPrivate && childIdx >= FirstHardenedChild {
 		return nil, ErrHardnedChildPublicKey
 	}
@@ -95,6 +99,9 @@ func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, er
 		childKey.Version = EDDSAHDPrivateKeyID[:]
 		d := new(big.Int).SetBytes(key.Key)
 		sk, err := CreateEDDSAPrivateKey(d)
+		if err != nil {
+			return nil, err
+		}
 		parentPubBytes := CompressEDDSAPubKey(sk.PubKey())
 		fingerprint, err := hash160(parentPubBytes)
 		if err != nil {
@@ -103,12 +110,20 @@ func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, er
 		childKey.FingerPrint = fingerprint[:4]
 		childKey.Key = addPrivateKeys(Edwards(), intermediary[:32], key.Key)
 
+		// Validate key
+		err = validatePrivateKey(Edwards(), childKey.Key)
+		if err != nil {
+			return nil, err
+		}
 		// Bip32 CKDpub
 	} else {
-		childKey.Version = EDDSAHDPublicKeyID[:]
 		d := new(big.Int).SetBytes(intermediary[:32])
 		sk, err := CreateEDDSAPrivateKey(d)
+		if err != nil {
+			return nil, err
+		}
 
+		childKey.Version = EDDSAHDPublicKeyID[:]
 		fingerprint, err := hash160(key.Key)
 		if err != nil {
 			return nil, err
@@ -116,6 +131,9 @@ func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, er
 		childKey.FingerPrint = fingerprint[:4]
 
 		parentPub, err := DecompressEDDSAPubKey(key.Key)
+		if err != nil {
+			return nil, err
+		}
 		x, y := parentPub.Add(sk.PubKey().X, sk.PubKey().Y, parentPub.X, parentPub.Y)
 		childPub := edwards.NewPublicKey(x, y)
 		childKey.Key = CompressEDDSAPubKey(childPub)
