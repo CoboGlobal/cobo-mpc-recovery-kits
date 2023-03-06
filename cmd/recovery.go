@@ -110,36 +110,36 @@ func ReconstructAndDerivePrivate(gInfo *tss.GroupInfo, shares tss.Shares) error 
 			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
 		}
 		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(chainCode, privateKey)
+		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
+			log.Fatalf("reconstructed root extended public key mismatch")
+		}
+		if err := DeriveKey(extPrivateKey); err != nil {
+			log.Fatalf("Failed to derive ECDSA key: %v", err)
+		}
+		fmt.Printf("\n")
 		if ShowRootPrivate {
 			log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
 			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
 		}
 		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-			log.Fatalf("reconstructed root extended public key mismatch")
-		}
-
-		if err := DeriveKey(extPrivateKey); err != nil {
-			log.Fatalf("Failed to derive EDDSA key: %v", err)
-		}
 	case crypto.ED25519:
 		privateKey, err := shares.ReconstructEDDSAKey(threshold, crypto.Edwards())
 		if err != nil {
 			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
 		}
 		extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)
+		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
+			log.Fatalf("reconstructed root extended public key mismatch")
+		}
+		if err := DeriveKey(extPrivateKey); err != nil {
+			log.Fatalf("Failed to derive EDDSA key: %v", err)
+		}
+		fmt.Printf("\n")
 		if ShowRootPrivate {
 			log.Println("Reconstructed root private key:", utils.Encode(privateKey.GetD().Bytes()))
 			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
 		}
 		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-			log.Fatalf("reconstructed root extended public key mismatch")
-		}
-
-		if err := DeriveKey(extPrivateKey); err != nil {
-			log.Fatalf("Failed to derive EDDSA key: %v", err)
-		}
 	default:
 		log.Fatalf("not supported curve type: %v", curveType)
 	}
