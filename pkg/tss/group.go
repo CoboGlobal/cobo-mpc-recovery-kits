@@ -88,7 +88,7 @@ func (p Participant) GenerateSharePub(curveType crypto.CurveType) (*SharePub, er
 
 	switch curveType {
 	case crypto.SECP256K1:
-		sharePub, err = crypto.DecompressPubKey(sharePubBytes)
+		sharePub, err = crypto.DecompressECDSAPubKey(sharePubBytes)
 		if err != nil {
 			return nil, fmt.Errorf("decompress public key error: %v", err)
 		}
@@ -159,7 +159,7 @@ func (s *ShareInfo) VerifySharePublicKey(curveType crypto.CurveType, key string)
 
 	switch curveType {
 	case crypto.SECP256K1:
-		sharePub, err := crypto.DecompressPubKey(sharePubBytes)
+		sharePub, err := crypto.DecompressECDSAPubKey(sharePubBytes)
 		if err != nil {
 			return fmt.Errorf("decompress public key error: %v", err)
 		}
@@ -225,13 +225,26 @@ func (g *GroupInfo) VerifyReconstructPublicKey() error {
 		if err != nil {
 			return fmt.Errorf("reconstruct public key error: %v", err)
 		}
-		extPubKey, err := crypto.CreateExtendedPublicKey(curveType, chainCode, pub)
+
+		// create extended public key
+		switch curveType {
+		case crypto.SECP256K1:
+			extPubKey := crypto.CreateECDSAExtendedPublicKey(pub, chainCode)
+			log.Println("Reconstructed root extended public key:", extPubKey.String())
+			if g.RootExtendedPubKey != extPubKey.String() {
+				return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
+			}
+		case crypto.ED25519:
+			extPubKey := crypto.CreateEDDSAExtendedPublicKey(crypto.CreateEDDSAPubKey(pub), chainCode)
+			log.Println("Reconstructed root extended public key:", extPubKey.String())
+			if g.RootExtendedPubKey != extPubKey.String() {
+				return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
+			}
+		default:
+			return fmt.Errorf("not support curve type: %v", curveType)
+		}
 		if err != nil {
 			return fmt.Errorf("create extended public key error: %v", err)
-		}
-		log.Println("Reconstructed root extended public key:", extPubKey.String())
-		if g.RootExtendedPubKey != extPubKey.String() {
-			return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
 		}
 	}
 	return nil
@@ -268,10 +281,7 @@ func (g *GroupInfo) VerifyReconstructPrivateKey(shares Shares, isShowPrivate boo
 		if isShowPrivate {
 			log.Println("Reconstructed root private key:", utils.Encode(privateKey.GetD().Bytes()))
 		}
-		extPubKey, err := crypto.CreateExtendedPublicKey(crypto.ED25519, chainCode, privateKey.PubKey().ToECDSA())
-		if err != nil {
-			return fmt.Errorf("create extended public key error: %v", err)
-		}
+		extPubKey := crypto.CreateEDDSAExtendedPublicKey(privateKey.PubKey(), chainCode)
 		log.Println("Reconstructed root extended public key:", extPubKey.String())
 		if g.RootExtendedPubKey != extPubKey.String() {
 			return fmt.Errorf("reconstructed root extended public key mismatch")

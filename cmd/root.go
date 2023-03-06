@@ -55,8 +55,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			log.Fatal("Check flags failed: ", err)
 		}
-		recoveryPrivateKey()
-		// deriveKey(privateKey)
+		recovery()
 	},
 }
 

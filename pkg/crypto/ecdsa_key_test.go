@@ -8,7 +8,7 @@ import (
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
 )
 
-func TestCompressPublicKey(t *testing.T) {
+func TestCompressECDSAPublicKey(t *testing.T) {
 	x := new(big.Int)
 	x, ok := x.SetString("9f4db6ea8ea62401f76f018b959d267bfb285391130fc8520bacb6a029df643a", 16)
 	if !ok {
@@ -24,12 +24,12 @@ func TestCompressPublicKey(t *testing.T) {
 		X:     x,
 		Y:     y,
 	}
-	compressPub := CompressPubKey(pub)
+	compressPub := CompressECDSAPubKey(pub)
 	if compressPub == nil {
 		t.Fatalf("compress failed")
 	}
 
-	pub1, err := DecompressPubKey(compressPub)
+	pub1, err := DecompressECDSAPubKey(compressPub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestCompressPublicKey(t *testing.T) {
 	pub2str := "0x049f4db6ea8ea62401f76f018b959d267bfb285391130fc8520bacb6a029df643af196a29d5575" +
 		"ca26cb965e73a4f4b022c7263edb22f2c96480ce0e89f7492b75"
 	pubBytes2, _ := utils.Decode(pub2str)
-	pub2, err := DecompressPubKey(pubBytes2)
+	pub2, err := DecompressECDSAPubKey(pubBytes2)
 	if err != nil {
 		t.Fatal(err)
 	}
