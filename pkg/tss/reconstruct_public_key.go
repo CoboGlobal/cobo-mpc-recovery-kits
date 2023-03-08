@@ -7,14 +7,14 @@ import (
 )
 
 type (
-	ECDSASharePub struct {
+	SharePub struct {
 		ID       *big.Int
 		SharePub *ecdsa.PublicKey
 	}
-	ECDSASharePubs []*ECDSASharePub
+	SharePubs []*SharePub
 )
 
-func (shares ECDSASharePubs) ReconstructKey(threshold int) (*ecdsa.PublicKey, error) {
+func (shares SharePubs) ReconstructKey(threshold int) (*ecdsa.PublicKey, error) {
 	if shares == nil || threshold < 1 {
 		return nil, fmt.Errorf("input error")
 	}

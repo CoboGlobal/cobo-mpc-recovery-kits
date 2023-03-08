@@ -20,17 +20,21 @@ import (
 	"github.com/tyler-smith/go-bip32"
 )
 
+// Wallet is a struct define address.csv file
+// Version 0: wallet name, coin, address, memo, address label, HD path, child publickey
+// Version 1: wallet name, coin, address, curve, memo, address label, HD path, child publickey.
 type Wallet struct {
-	Name         string
-	Coin         string
-	Address      string
-	Memo         string
-	AddressLabel string
-	HDPath       string
-	ChildPubKey  string
+	Version     uint32
+	AddressInfo *AddressInfo
+}
+type AddressInfo struct {
+	Name        string
+	Curve       string
+	HDPath      string
+	ChildPubKey string
 }
 
-func recoveryPrivateKey() *bip32.Key {
+func recovery() {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
 	}
@@ -38,7 +42,7 @@ func recoveryPrivateKey() *bip32.Key {
 		log.Fatal("nil group ID")
 	}
 	recoveryGroups := make([]*tss.Group, 0)
-	shares := make(tss.ECDSAShares, 0)
+	shares := make(tss.Shares, 0)
 
 	for _, groupFile := range GroupFiles {
 		_, err := os.Stat(groupFile)
@@ -72,7 +76,7 @@ func recoveryPrivateKey() *bip32.Key {
 		if err != nil {
 			log.Fatalln("Credentials error:", err)
 		}
-		share, err := group.ShareInfo.GenerateECDSAShare(key)
+		share, err := group.ShareInfo.BuildShare(key)
 		if err != nil {
 			log.Fatalln("Group generate share error:", err)
 		}
@@ -86,54 +90,78 @@ func recoveryPrivateKey() *bip32.Key {
 	if int(threshold) > len(recoveryGroups) {
 		log.Fatalf("Number of groups parse from files less than threshold %v", threshold)
 	}
-
-	privateKey, err := shares.ReconstructKey(int(threshold), crypto.S256())
-	if err != nil {
-		log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
+	if err := ReconstructAndDerivePrivate(recoveryGroup.GroupInfo, shares); err != nil {
+		log.Fatal(err)
 	}
+}
 
-	chainCode, err := utils.Decode(recoveryGroup.GroupInfo.ChainCode)
+func ReconstructAndDerivePrivate(gInfo *tss.GroupInfo, shares tss.Shares) error {
+	curveType := crypto.CurveNameType[gInfo.Curve]
+	threshold := int(gInfo.Threshold)
+	chainCode, err := utils.Decode(gInfo.ChainCode)
 	if err != nil {
 		log.Fatalf("TSS group recovery failed to parse chaincode: %v", err)
 	}
 
-	// Create root extended private key
-	extPrivateKey := &bip32.Key{
-		Version:     bip32.PrivateWalletVersion,
-		ChainCode:   chainCode,
-		Key:         privateKey.D.Bytes(),
-		Depth:       0x0,
-		ChildNumber: []byte{0x00, 0x00, 0x00, 0x00},
-		FingerPrint: []byte{0x00, 0x00, 0x00, 0x00},
-		IsPrivate:   true,
+	switch curveType {
+	case crypto.SECP256K1:
+		privateKey, err := shares.ReconstructECDSAKey(threshold, crypto.S256())
+		if err != nil {
+			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
+		}
+		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(privateKey, chainCode)
+		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
+			log.Fatalf("reconstructed root extended public key mismatch")
+		}
+		if err := DeriveKey(extPrivateKey); err != nil {
+			log.Fatalf("Failed to derive ECDSA key: %v", err)
+		}
+		fmt.Printf("\n")
+		if ShowRootPrivate {
+			log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
+			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
+		}
+		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
+	case crypto.ED25519:
+		privateKey, err := shares.ReconstructEDDSAKey(threshold, crypto.Edwards())
+		if err != nil {
+			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
+		}
+		extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)
+		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
+			log.Fatalf("reconstructed root extended public key mismatch")
+		}
+		if err := DeriveKey(extPrivateKey); err != nil {
+			log.Fatalf("Failed to derive EDDSA key: %v", err)
+		}
+		fmt.Printf("\n")
+		if ShowRootPrivate {
+			log.Println("Reconstructed root private key:", utils.Encode(privateKey.GetD().Bytes()))
+			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
+		}
+		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
+	default:
+		log.Fatalf("not supported curve type: %v", curveType)
 	}
-	if ShowRootPrivate {
-		log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
-		log.Println("Reconstructed root extended private key:", extPrivateKey.String())
-	}
-	log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-	if recoveryGroup.GroupInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-		log.Fatalf("Reconstructed root extended public key mismatch")
-	}
-	return extPrivateKey
+	return nil
 }
 
-func deriveKey(key *bip32.Key) {
+func DeriveKey(key interface{}) error {
 	if key == nil {
 		log.Fatal("no extended key input")
 	}
 	// parse path
 	if len(Paths) > 0 {
 		for _, path := range Paths {
-			if _, err := derive(key, path); err != nil {
+			if _, err := Derive(key, path); err != nil {
 				log.Fatalf("Derive path %v error: %v", path, err)
 			}
 		}
-		return
+		return nil
 	}
 	// parse csv file
 	if Csv == "" {
-		return
+		return nil
 	} else if _, err := os.Stat(Csv); err != nil {
 		log.Fatalf("csv file %v state error: %v", Csv, err)
 	}
@@ -142,42 +170,186 @@ func deriveKey(key *bip32.Key) {
 	fileType := path.Ext(fileFullName)
 	fileName := strings.TrimSuffix(fileFullName, fileType)
 	CsvOutputFile := strings.TrimSuffix(CsvOutputDir, "/") + "/" + fileName + "-recovery-" +
-		time.Now().Format("20060102-150405") + fileType
+		time.Now().Format(time.RFC3339) + fileType
 	if _, err := os.Stat(CsvOutputFile); err == nil || os.IsExist(err) {
 		log.Fatalf("File %v already exists, please backup and remove", CsvOutputFile)
 	}
 
 	log.Printf("Derive keys from %v to %v:", Csv, CsvOutputFile)
-	if err := deriveKeyInCSV(key, Csv, CsvOutputFile); err != nil {
+	if err := DeriveKeyInCSV(key, Csv, CsvOutputFile); err != nil {
 		log.Fatalf("Derive keys in csv file failed: %v", err)
 	}
+	return nil
 }
 
-func derive(extendedKey *bip32.Key, path string) (deriveKey *bip32.Key, err error) {
+func Derive(key interface{}, path string) (interface{}, error) {
 	if path == "" {
-		err = fmt.Errorf("path is nil")
-		return
+		return nil, fmt.Errorf("path is nil")
 	}
-	deriveKey = extendedKey
-	indexes, err := getPath(path)
+	indexes, err := GetPath(path)
 	if err != nil {
-		return
+		return nil, err
 	}
-	for _, index := range indexes {
-		deriveKey, err = deriveKey.NewChildKey(index)
-		if err != nil {
-			return
+	k := key
+	switch deriveKey := k.(type) {
+	case *bip32.Key:
+		for _, index := range indexes {
+			deriveKey, err = deriveKey.NewChildKey(index)
+			if err != nil {
+				return nil, fmt.Errorf("derive key failed: %v", err)
+			}
 		}
+		k = deriveKey
+		if deriveKey.IsPrivate {
+			log.Printf("Path: %v derived child private key: %v", path, utils.Encode(deriveKey.Key))
+			log.Printf("Path: %v derived child extended private key: %v", path, deriveKey.String())
+		}
+		log.Printf("Path: %v derived child extended public key: %v", path, deriveKey.PublicKey().String())
+	case *crypto.EDDSAExtendedKey:
+		for _, index := range indexes {
+			deriveKey, err = deriveKey.NewChildKey(index)
+			if err != nil {
+				return nil, fmt.Errorf("derive key failed: %v", err)
+			}
+		}
+		if deriveKey.IsPrivate {
+			log.Printf("Path: %v derived child private key: %v", path, utils.Encode(deriveKey.Key))
+			log.Printf("Path: %v derived child extended private key: %v", path, deriveKey.String())
+		}
+		k = deriveKey
+		log.Printf("Path: %v derived child extended public key: %v", path, deriveKey.PublicKey().String())
+	default:
+		return nil, fmt.Errorf("derive key error type")
 	}
-	if deriveKey.IsPrivate {
-		log.Printf("Path: %v derived child private key: %v", path, utils.Encode(deriveKey.Key))
-		log.Printf("Path: %v derived child extended private key: %v", path, deriveKey.String())
-	}
-	log.Printf("Path: %v derived child extended public key: %v", path, deriveKey.PublicKey().String())
-	return
+	return k, nil
 }
 
-func getPath(path string) ([]uint32, error) {
+//nolint:gocognit
+func DeriveKeyInCSV(key interface{}, inputFile string, outputFile string) error {
+	readFile, err := os.Open(inputFile)
+	if err != nil {
+		return fmt.Errorf("open %v failed: %v", inputFile, err)
+	}
+
+	writeFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+	if err != nil {
+		return fmt.Errorf("create and open %v failed: %v", outputFile, err)
+	}
+	defer readFile.Close()
+	defer writeFile.Close()
+
+	reader := csv.NewReader(readFile)
+	writer := csv.NewWriter(writeFile)
+
+	// title line
+	line, err := reader.Read()
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("read error: %v", err)
+	}
+	wallet := Wallet{}
+	if line[0] != "wallet name" {
+		return fmt.Errorf("first line is not title in csv file")
+	}
+	if len(line) == 7 {
+		wallet.Version = 0
+	} else if len(line) == 8 && line[3] == "curve" {
+		wallet.Version = 1
+	} else {
+		return fmt.Errorf("title line not recognized")
+	}
+
+	writeTitle := append(line, "hex private key", "extended private key", "extended public key")
+	err = writer.Write(writeTitle)
+	if err != nil {
+		return fmt.Errorf("write title error: %v", err)
+	}
+	writer.Flush()
+
+	// handle each line
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("read error: %v", err)
+		}
+		switch wallet.Version {
+		case 0:
+			wallet.AddressInfo = &AddressInfo{
+				Name:        line[0],
+				Curve:       "secp256k1",
+				HDPath:      line[5],
+				ChildPubKey: line[6],
+			}
+		case 1:
+			wallet.AddressInfo = &AddressInfo{
+				Name:        line[0],
+				Curve:       line[3],
+				HDPath:      line[6],
+				ChildPubKey: line[7],
+			}
+		default:
+			return fmt.Errorf("error wallet version")
+		}
+
+		var prv, prvExt, pubExt string
+		switch key.(type) {
+		case *bip32.Key:
+			if crypto.CurveNameType[wallet.AddressInfo.Curve] == crypto.SECP256K1 {
+				deriveKey, err := Derive(key, wallet.AddressInfo.HDPath)
+				if err != nil {
+					log.Errorf("Derive error: %v, address info: %v", err, wallet.AddressInfo)
+					break
+				}
+				k, ok := deriveKey.(*bip32.Key)
+				if !ok {
+					return fmt.Errorf("key error type")
+				}
+				if k.IsPrivate {
+					prv = utils.Encode(k.Key)
+					prvExt = k.String()
+				}
+				pubExt = k.PublicKey().String()
+			}
+
+		case *crypto.EDDSAExtendedKey:
+			if crypto.CurveNameType[wallet.AddressInfo.Curve] == crypto.ED25519 {
+				deriveKey, err := Derive(key, wallet.AddressInfo.HDPath)
+				if err != nil {
+					log.Errorf("Derive error: %v, address info: %v", err, wallet.AddressInfo)
+					break
+				}
+				k, ok := deriveKey.(*crypto.EDDSAExtendedKey)
+				if !ok {
+					return fmt.Errorf("key error type")
+				}
+				if k.IsPrivate {
+					prv = utils.Encode(k.Key)
+					prvExt = k.String()
+				}
+				pubExt = k.PublicKey().String()
+			}
+		default:
+			return fmt.Errorf("key error type")
+		}
+
+		childPubKey := strings.TrimSpace(strings.ReplaceAll(wallet.AddressInfo.ChildPubKey, " ", ""))
+		if childPubKey != "" && pubExt != "" && childPubKey != pubExt {
+			log.Warnf("Derived child public key mismatch, address info: %v", wallet.AddressInfo)
+		}
+
+		// write to csv file
+		writeLine := append(line, prv, prvExt, pubExt)
+		if err := writer.Write(writeLine); err != nil {
+			return fmt.Errorf("write derived keys error: %v", err)
+		}
+		writer.Flush()
+	}
+	log.Printf("Derive keys from %s to %s completed", inputFile, outputFile)
+	return nil
+}
+
+func GetPath(path string) ([]uint32, error) {
 	path = strings.TrimSpace(strings.ReplaceAll(path, " ", ""))
 	path = strings.TrimPrefix(path, "m")
 	path = strings.TrimPrefix(path, "/m")
@@ -211,79 +383,4 @@ func getPath(path string) ([]uint32, error) {
 		indexes = append(indexes, i)
 	}
 	return indexes, nil
-}
-
-func deriveKeyInCSV(extendedKey *bip32.Key, inputFile string, outputFile string) error {
-	readFile, err := os.Open(inputFile)
-	if err != nil {
-		return fmt.Errorf("open %v failed: %v", inputFile, err)
-	}
-
-	writeFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
-	if err != nil {
-		return fmt.Errorf("create and open %v failed: %v", outputFile, err)
-	}
-	defer readFile.Close()
-	defer writeFile.Close()
-
-	reader := csv.NewReader(readFile)
-	writer := csv.NewWriter(writeFile)
-
-	// title line
-	line, err := reader.Read()
-	if err != nil && err != io.EOF {
-		return fmt.Errorf("read error: %v", err)
-	}
-	if line[0] == "wallet name" {
-		writeTitle := append(line, "hex private key", "extended private key", "extended public key")
-		err := writer.Write(writeTitle)
-		if err != nil {
-			return fmt.Errorf("write title error: %v", err)
-		}
-		writer.Flush()
-	}
-
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return fmt.Errorf("read error: %v", err)
-		}
-		wallet := Wallet{
-			Name:         line[0],
-			Coin:         line[1],
-			Address:      line[2],
-			Memo:         line[3],
-			AddressLabel: line[4],
-			HDPath:       line[5],
-			ChildPubKey:  line[6],
-		}
-		deriveKey, err := derive(extendedKey, wallet.HDPath)
-		if err != nil {
-			log.Errorf("Derive error: %v, wallet info: %v", err, wallet)
-		}
-		prv := ""
-		prvExt := ""
-		pubExt := ""
-		if deriveKey != nil {
-			if deriveKey.IsPrivate {
-				prv = utils.Encode(deriveKey.Key)
-				prvExt = deriveKey.String()
-			}
-			pubExt = deriveKey.PublicKey().String()
-		}
-		childPubKey := strings.TrimSpace(strings.ReplaceAll(wallet.ChildPubKey, " ", ""))
-		if childPubKey != "" && pubExt != "" && childPubKey != pubExt {
-			log.Warnf("Derived child public key mismatch, wallet info: %v", wallet)
-		}
-		// write to csv file
-		writeLine := append(line, prv, prvExt, pubExt)
-		if err := writer.Write(writeLine); err != nil {
-			return fmt.Errorf("write derived keys error: %v", err)
-		}
-		writer.Flush()
-	}
-	log.Printf("Derive keys from %s to %s completed", inputFile, outputFile)
-	return nil
 }
