@@ -109,7 +109,7 @@ func ReconstructAndDerivePrivate(gInfo *tss.GroupInfo, shares tss.Shares) error 
 		if err != nil {
 			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
 		}
-		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(chainCode, privateKey)
+		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(privateKey, chainCode)
 		if gInfo.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
 			log.Fatalf("reconstructed root extended public key mismatch")
 		}

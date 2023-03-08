@@ -50,7 +50,7 @@ func CreateECDSAExtendedPublicKey(pub *ecdsa.PublicKey, chaincode []byte) *bip32
 	return extPubKey
 }
 
-func CreateECDSAExtendedPrivateKey(chaincode []byte, private *ecdsa.PrivateKey) *bip32.Key {
+func CreateECDSAExtendedPrivateKey(private *ecdsa.PrivateKey, chaincode []byte) *bip32.Key {
 	extPrivateKey := &bip32.Key{
 		Version:     bip32.PrivateWalletVersion,
 		ChainCode:   chaincode,

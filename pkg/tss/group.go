@@ -264,7 +264,7 @@ func (g *GroupInfo) VerifyReconstructPrivateKey(shares Shares, isShowPrivate boo
 		if err != nil {
 			return fmt.Errorf("TSS group recovery failed to reconstruct root private key: %v", err)
 		}
-		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(chainCode, privateKey)
+		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(privateKey, chainCode)
 		if isShowPrivate {
 			log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
 			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
