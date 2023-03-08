@@ -11,6 +11,9 @@ import (
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 )
 
+// The functions below do not implement the full BIP-32 specification.
+// we only use non-hardened derived keys for eddsa
+
 // FirstHardenedChild is the index of the firxt "harded" child key as per the
 // bip32 spec.
 const FirstHardenedChild = uint32(0x80000000)
@@ -23,9 +26,8 @@ var (
 	// has an incorrect length.
 	ErrSerializedKeyWrongSize = errors.New("Serialized keys should by exactly 82 bytes")
 
-	// ErrHardnedChildPublicKey is returned when trying to create a harded child
-	// of the public key.
-	ErrHardnedChildPublicKey = errors.New("Can't create hardened child for public key")
+	// ErrHardnedChildKey is returned when trying to create a harded child key.
+	ErrHardnedChildKey = errors.New("Can't create hardened child key")
 
 	// ErrInvalidChecksum is returned when deserializing a key with an incorrect
 	// checksum.
@@ -38,7 +40,7 @@ var (
 	ErrInvalidPublicKey = errors.New("Invalid public key")
 )
 
-// EDDSAExtendedKey represents a bip32 extended key
+// EDDSAExtendedKey represents a non-hardened bip32 extended key
 
 // private key 32 bytes
 // public key 0x00 + 32 bytes
@@ -79,8 +81,8 @@ func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExt
 // NewChildKey derives a child key from a given parent as outlined by bip32.
 func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, error) {
 	// Fail early if trying to create hardened child from public key
-	if !key.IsPrivate && childIdx >= FirstHardenedChild {
-		return nil, ErrHardnedChildPublicKey
+	if childIdx >= FirstHardenedChild {
+		return nil, ErrHardnedChildKey
 	}
 
 	intermediary, err := key.getIntermediary(childIdx)
