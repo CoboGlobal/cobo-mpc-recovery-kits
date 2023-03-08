@@ -45,7 +45,7 @@ type ShareInfo struct {
 	KDF            *cipher.KDF `json:"kdf"`
 }
 
-func (s *ShareInfo) GenerateShare(key string) (*Share, error) {
+func (s *ShareInfo) BuildShare(key string) (*Share, error) {
 	if s == nil || key == "" {
 		return nil, fmt.Errorf("input error")
 	}
@@ -77,7 +77,7 @@ func (s *ShareInfo) GenerateShare(key string) (*Share, error) {
 	return secret, nil
 }
 
-func (p Participant) GenerateSharePub(curveType crypto.CurveType) (*SharePub, error) {
+func (p Participant) BuildSharePub(curveType crypto.CurveType) (*SharePub, error) {
 	var ok bool
 	var sharePub *ecdsa.PublicKey
 
@@ -118,7 +118,7 @@ func (p Participant) GenerateSharePub(curveType crypto.CurveType) (*SharePub, er
 func (parts ParticipantsInfo) ReconstructPublicKey(curveType crypto.CurveType, threshold int) (*ecdsa.PublicKey, error) {
 	sharePubs := make(SharePubs, 0)
 	for _, p := range parts {
-		sharePub, err := p.GenerateSharePub(curveType)
+		sharePub, err := p.BuildSharePub(curveType)
 		if err != nil {
 			return nil, fmt.Errorf("generate share public error: %v", err)
 		}

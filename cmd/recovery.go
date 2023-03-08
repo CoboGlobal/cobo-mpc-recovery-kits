@@ -76,7 +76,7 @@ func recovery() {
 		if err != nil {
 			log.Fatalln("Credentials error:", err)
 		}
-		share, err := group.ShareInfo.GenerateShare(key)
+		share, err := group.ShareInfo.BuildShare(key)
 		if err != nil {
 			log.Fatalln("Group generate share error:", err)
 		}
