@@ -9,7 +9,7 @@ import (
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 )
 
-func CreateEDDSAPubKey(pub *ecdsa.PublicKey) *edwards.PublicKey {
+func ConvertECDSAPubkeyToEDDSA(pub *ecdsa.PublicKey) *edwards.PublicKey {
 	ed := &edwards.PublicKey{
 		Curve: pub.Curve,
 		X:     pub.X,

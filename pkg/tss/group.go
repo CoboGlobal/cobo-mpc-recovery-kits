@@ -1,16 +1,29 @@
 package tss
 
 import (
-	"bytes"
-	"crypto/ecdsa"
 	"fmt"
-	"math/big"
 
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
-	log "github.com/sirupsen/logrus"
 )
+
+const (
+	GroupVersionV1 = 1
+	GroupVersionV2 = 2
+	GroupVersionV3 = 3
+)
+
+const (
+	GroupTypeEcdsaTSS int32 = 1
+	GroupTypeEddsaTSS int32 = 2
+)
+
+type GroupKeyBuilder interface {
+	VerifySharePublicKey(share []byte, sharePubKey string) error
+	ReconstructPublicKey(sharePubs SharePubs, threshold int, chainCode []byte) (crypto.CKDKey, error)
+	BuildSharePub(p Participant) (*SharePub, error)
+	ReconstructPrivateKey(shares Shares, threshold int, chainCode []byte) (crypto.CKDKey, error)
+}
 
 type Group struct {
 	Version   int32      `json:"version"`
@@ -45,251 +58,246 @@ type ShareInfo struct {
 	KDF            *cipher.KDF `json:"kdf"`
 }
 
-func (s *ShareInfo) BuildShare(key string) (*Share, error) {
-	if s == nil || key == "" {
-		return nil, fmt.Errorf("input error")
-	}
-	if s.KDF == nil {
-		return nil, fmt.Errorf("encrypted share KDF nil")
-	}
-
-	aesGCM, err := cipher.NewAES256GCMWithPassPhrase(key, s.KDF)
-	if err != nil {
-		return nil, err
-	}
-	shareBytes, err := aesGCM.Decrypt(s.EncryptedShare)
-	if err != nil {
-		return nil, fmt.Errorf("AES GCM decrypt error: %v", err)
-	}
-
-	shareID := new(big.Int)
-	shareID, ok := shareID.SetString(s.ShareID, 10)
-	if !ok {
-		return nil, fmt.Errorf("share ID parse error")
-	}
-	share := new(big.Int)
-	share = share.SetBytes(shareBytes)
-
-	secret := &Share{
-		Xi: share,
-		ID: shareID,
-	}
-	return secret, nil
+type EncryptedPartyInfo struct {
+	Share []byte `json:"encrypted_share"`
 }
 
-func (p Participant) BuildSharePub(curveType crypto.CurveType) (*SharePub, error) {
-	var ok bool
-	var sharePub *ecdsa.PublicKey
-
-	sharePubBytes, err := utils.Decode(p.SharePubKey)
-	if err != nil {
-		return nil, fmt.Errorf("share public key decode error: %v", err)
-	}
-
+func NewGroupKeyBuilder(curveType crypto.CurveType) (GroupKeyBuilder, error) {
 	switch curveType {
 	case crypto.SECP256K1:
-		sharePub, err = crypto.DecompressECDSAPubKey(sharePubBytes)
-		if err != nil {
-			return nil, fmt.Errorf("decompress public key error: %v", err)
-		}
-
+		return NewECDSAKeyBuilder(crypto.S256()), nil
 	case crypto.ED25519:
-		pub, err := crypto.DecompressEDDSAPubKey(sharePubBytes)
-		if err != nil {
-			return nil, fmt.Errorf("decompress public key error: %v", err)
-		}
-		sharePub = pub.ToECDSA()
+		return NewEDDSAKeyBuilder(crypto.Edwards()), nil
+
 	default:
 		return nil, fmt.Errorf("not supported curve type: %v", curveType)
 	}
-
-	shareID := new(big.Int)
-	shareID, ok = shareID.SetString(p.ShareID, 10)
-	if !ok {
-		return nil, fmt.Errorf("share ID parse error")
-	}
-	public := &SharePub{
-		ID:       shareID,
-		SharePub: sharePub,
-	}
-	return public, nil
 }
 
-func (parts ParticipantsInfo) ReconstructPublicKey(curveType crypto.CurveType, threshold int) (*ecdsa.PublicKey, error) {
-	sharePubs := make(SharePubs, 0)
-	for _, p := range parts {
-		sharePub, err := p.BuildSharePub(curveType)
-		if err != nil {
-			return nil, fmt.Errorf("generate share public error: %v", err)
+func (g *Group) CheckGroupParams() error {
+	if g == nil || g.GroupInfo == nil || g.ShareInfo == nil {
+		return fmt.Errorf("group param empty")
+	}
+	if g.GroupInfo.ID == "" {
+		return fmt.Errorf("group id mismatch")
+	}
+	if g.GroupInfo.Type != GroupTypeEcdsaTSS && g.GroupInfo.Type != GroupTypeEddsaTSS {
+		return fmt.Errorf("group param type not supported")
+	}
+	if g.GroupInfo.RootExtendedPubKey == "" {
+		return fmt.Errorf("group param root extended public key empty")
+	}
+	if g.GroupInfo.ChainCode == "" {
+		return fmt.Errorf("group param chaincode empty")
+	}
+	if crypto.CurveNameType[g.GroupInfo.Curve] != crypto.SECP256K1 &&
+		crypto.CurveNameType[g.GroupInfo.Curve] != crypto.ED25519 {
+		return fmt.Errorf("group param curve not supported")
+	}
+	if g.GroupInfo.Threshold < 1 {
+		return fmt.Errorf("group param threshold not supported")
+	}
+	if g.GroupInfo.Threshold > int32(len(g.GroupInfo.Participants)) {
+		return fmt.Errorf("group param participants less than threshold")
+	}
+
+	if g.ShareInfo.NodeID == "" {
+		return fmt.Errorf("group param node id empty")
+	}
+	if g.ShareInfo.ShareID == "" {
+		return fmt.Errorf("group param share ID empty")
+	}
+	if g.ShareInfo.SharePubKey == "" {
+		return fmt.Errorf("group param share public key empty")
+	}
+	if g.ShareInfo.EncryptedShare == nil {
+		return fmt.Errorf("group param encrypted share empty")
+	}
+	if g.ShareInfo.KDF == nil {
+		return fmt.Errorf("group param encrypt KDF empty")
+	}
+	return g.checkGroupParticipants()
+}
+
+//nolint:gocognit
+func (g *Group) checkGroupParticipants() error {
+	parts := g.GroupInfo.Participants
+	if int(g.GroupInfo.Threshold) > len(parts) {
+		return fmt.Errorf("number of participants %v parse from files less than threshold %v",
+			len(g.GroupInfo.Participants), int(g.GroupInfo.Threshold))
+	}
+	foundSharePart := false
+	for i, part := range parts {
+		if part.NodeID == "" {
+			return fmt.Errorf("participant (no.%v) node id nil", i+1)
 		}
-		sharePubs = append(sharePubs, sharePub)
+		if part.ShareID == "" {
+			return fmt.Errorf("participant (no.%v) share ID nil", i+1)
+		}
+		if part.SharePubKey == "" {
+			return fmt.Errorf("participant (no.%v) share public key nil", i+1)
+		}
+		for j := 0; j < len(parts); j++ {
+			if i == j {
+				continue
+			}
+			if part.NodeID == parts[j].NodeID {
+				return fmt.Errorf("participants (no.%v) and (no.%v) node ids should be different", i+1, j+1)
+			}
+			if part.ShareID == parts[j].ShareID {
+				return fmt.Errorf("participants (no.%v) and (no.%v) share ids should be different", i+1, j+1)
+			}
+			if part.SharePubKey == parts[j].SharePubKey {
+				return fmt.Errorf("participants (no.%v) and (no.%v) share public keys should be different", i+1, j+1)
+			}
+		}
+		if part.NodeID == g.ShareInfo.NodeID {
+			if part.ShareID != g.ShareInfo.ShareID {
+				return fmt.Errorf("participant (no.%v) mismatch with share id in share info", i+1)
+			}
+			if part.SharePubKey != g.ShareInfo.SharePubKey {
+				return fmt.Errorf("participant (no.%v) mismatch with share public key in share info", i+1)
+			}
+			foundSharePart = true
+		}
 	}
-	if threshold > len(sharePubs) {
-		return nil, fmt.Errorf("number of participants %v parse from files less than threshold %v", len(sharePubs), threshold)
+	if !foundSharePart {
+		return fmt.Errorf("cannot found share info in participants")
 	}
-	pubKey, err := sharePubs.ReconstructKey(threshold)
-	if err != nil {
-		return nil, fmt.Errorf("failed to reconstruct root public key: %v", err)
-	}
-	return pubKey, nil
+	return nil
 }
 
-func (s *ShareInfo) VerifySharePublicKey(curveType crypto.CurveType, key string) error {
-	if s == nil || key == "" {
-		return fmt.Errorf("input error")
+func (g *Group) CheckWithGroup(group *Group) error {
+	if g.GroupInfo.ID != group.GroupInfo.ID {
+		return fmt.Errorf("group ids mismatch")
 	}
-	if s.KDF == nil {
-		return fmt.Errorf("encrypted share KDF nil")
+	if g.GroupInfo.Type != group.GroupInfo.Type {
+		return fmt.Errorf("group types mismatch")
 	}
+	if g.GroupInfo.RootExtendedPubKey != group.GroupInfo.RootExtendedPubKey {
+		return fmt.Errorf("group root extended public keys mismatch")
+	}
+	if g.GroupInfo.ChainCode != group.GroupInfo.ChainCode {
+		return fmt.Errorf("group chaincodes mismatch")
+	}
+	if g.GroupInfo.Curve != group.GroupInfo.Curve {
+		return fmt.Errorf("group curves mismatch")
+	}
+	if g.GroupInfo.Threshold != group.GroupInfo.Threshold {
+		return fmt.Errorf("group thresholds mismatch")
+	}
+	if g.ShareInfo.NodeID == group.ShareInfo.NodeID {
+		return fmt.Errorf("node ids should be different")
+	}
+	if g.ShareInfo.ShareID == group.ShareInfo.ShareID {
+		return fmt.Errorf("share ids should be different")
+	}
+	if g.ShareInfo.SharePubKey == group.ShareInfo.SharePubKey {
+		return fmt.Errorf("share public keys should be different")
+	}
+	return g.checkWithGroupParticipants(group)
+}
 
-	aesGCM, err := cipher.NewAES256GCMWithPassPhrase(key, s.KDF)
+func (g *Group) checkWithGroupParticipants(group *Group) error {
+	parts1 := g.GroupInfo.Participants
+	parts2 := group.GroupInfo.Participants
+	if len(parts1) != len(parts2) {
+		return fmt.Errorf("participants length mismatch")
+	}
+	for _, part1 := range parts1 {
+		foundSamePart := false
+		for _, part2 := range parts2 {
+			if part1 == part2 {
+				foundSamePart = true
+			}
+		}
+		if !foundSamePart {
+			return fmt.Errorf("participant (node id: %v) cannot found in other participants", part1.NodeID)
+		}
+	}
+	for _, part2 := range parts2 {
+		foundSamePart := false
+		for _, part1 := range parts1 {
+			if part2 == part1 {
+				foundSamePart = true
+			}
+		}
+		if !foundSamePart {
+			return fmt.Errorf("participant (node id: %v) cannot found in other participants", part2.NodeID)
+		}
+	}
+	return nil
+}
+
+func (g *Group) VerifyRootPublicKey() error {
+	if g.GroupInfo == nil {
+		return fmt.Errorf("group info is empty")
+	}
+	builder, err := NewGroupKeyBuilder(crypto.CurveNameType[g.GroupInfo.Curve])
 	if err != nil {
 		return err
 	}
-	shareBytes, err := aesGCM.Decrypt(s.EncryptedShare)
-	if err != nil {
-		return fmt.Errorf("AES GCM decrypt error: %v", err)
-	}
-	d := new(big.Int).SetBytes(shareBytes)
-
-	sharePubBytes, err := utils.Decode(s.SharePubKey)
-	if err != nil {
-		return fmt.Errorf("share public key decode error: %v", err)
-	}
-
-	switch curveType {
-	case crypto.SECP256K1:
-		sharePub, err := crypto.DecompressECDSAPubKey(sharePubBytes)
-		if err != nil {
-			return fmt.Errorf("decompress public key error: %v", err)
-		}
-		prvKey := crypto.CreateECDSAPrivateKey(crypto.S256(), d)
-		log.Printf("Derived share public key: 0x04%064x%064x\n", prvKey.PublicKey.X.Bytes(), prvKey.PublicKey.Y.Bytes())
-		if !prvKey.PublicKey.Equal(sharePub) {
-			return fmt.Errorf("derived share public key differ, verify share info failed")
-		}
-	case crypto.ED25519:
-		sharePub, err := crypto.DecompressEDDSAPubKey(sharePubBytes)
-		if err != nil {
-			return fmt.Errorf("decompress public key error: %v", err)
-		}
-		prvKey, err := crypto.CreateEDDSAPrivateKey(d)
-		if err != nil {
-			return fmt.Errorf("create EDDSA private key error: %v", err)
-		}
-		log.Printf("Derived share public key: 0x%064x\n", prvKey.PubKey().Serialize())
-		if !bytes.Equal(prvKey.PubKey().Serialize(), sharePub.Serialize()) {
-			return fmt.Errorf("derived share public key differ, verify share info failed")
-		}
-	default:
-		return fmt.Errorf("not supported curve type: %v", curveType)
-	}
-	return nil
+	return g.GroupInfo.verifyRootPublicKey(builder)
 }
 
-func (g *GroupInfo) VerifyReconstructPublicKey() error {
-	if g == nil {
-		return fmt.Errorf("input error")
+func (g *Group) VerifySharePublicKey(keys ...string) error {
+	if g.ShareInfo == nil {
+		return fmt.Errorf("group share info is empty")
 	}
-	threshold := int(g.Threshold)
-	parts := g.Participants
-	if threshold < 1 || len(parts) == 0 {
-		return fmt.Errorf("number of participants or threshold error")
+	var share []byte
+	var err error
+	if g.Version >= GroupVersionV2 {
+		share, err = g.ShareInfo.decryptShareV2(keys...)
+	} else {
+		share, err = g.ShareInfo.decryptShare(keys...)
 	}
-	if threshold > len(parts) {
-		return fmt.Errorf("number of participants %v parse from files less than threshold %v", len(parts), threshold)
-	}
-	chainCode, err := utils.Decode(g.ChainCode)
 	if err != nil {
-		return fmt.Errorf("failed to parse chaincode: %v", err)
+		return err
 	}
-	curveType := crypto.CurveNameType[g.Curve]
-	fixedParts := make(ParticipantsInfo, 0)
-	fixedIndexes := make([]int, 0)
-	for i := 0; i < threshold-1; i++ {
-		fixedParts = append(fixedParts, parts[i])
-		fixedIndexes = append(fixedIndexes, i)
+	builder, err := NewGroupKeyBuilder(crypto.CurveNameType[g.GroupInfo.Curve])
+	if err != nil {
+		return err
 	}
-	for i := threshold - 1; i < len(parts); i++ {
-		selectParts := fixedParts
-		selectParts = append(selectParts, parts[i])
-		selectIndexes := fixedIndexes
-		selectIndexes = append(selectIndexes, i)
 
-		indexesStr := ""
-		for _, index := range selectIndexes {
-			indexesStr = indexesStr + fmt.Sprintf("(no.%v) ", index+1)
-		}
-		log.Printf("Use participants %v to reconstruct root extended public key ...", indexesStr)
-		pub, err := selectParts.ReconstructPublicKey(curveType, threshold)
-		if err != nil {
-			return fmt.Errorf("reconstruct public key error: %v", err)
-		}
-
-		// create extended public key
-		switch curveType {
-		case crypto.SECP256K1:
-			extPubKey := crypto.CreateECDSAExtendedPublicKey(pub, chainCode)
-			log.Println("Reconstructed root extended public key:", extPubKey.String())
-			if g.RootExtendedPubKey != extPubKey.String() {
-				return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
-			}
-		case crypto.ED25519:
-			extPubKey := crypto.CreateEDDSAExtendedPublicKey(crypto.CreateEDDSAPubKey(pub), chainCode)
-			log.Println("Reconstructed root extended public key:", extPubKey.String())
-			if g.RootExtendedPubKey != extPubKey.String() {
-				return fmt.Errorf("reconstructed root public key differ, verify root public key failed")
-			}
-		default:
-			return fmt.Errorf("not support curve type: %v", curveType)
-		}
-		if err != nil {
-			return fmt.Errorf("create extended public key error: %v", err)
-		}
-	}
-	return nil
+	return builder.VerifySharePublicKey(share, g.ShareInfo.SharePubKey)
 }
 
-func (g *GroupInfo) VerifyReconstructPrivateKey(shares Shares, isShowPrivate bool) error {
-	curveType := crypto.CurveNameType[g.Curve]
-	threshold := int(g.Threshold)
-	chainCode, err := utils.Decode(g.ChainCode)
+func (g *Group) DecryptShare(keys ...string) (*Share, error) {
+	if g.ShareInfo == nil {
+		return nil, fmt.Errorf("group share info is empty")
+	}
+	var share []byte
+	var err error
+	if g.Version >= GroupVersionV2 {
+		share, err = g.ShareInfo.decryptShareV2(keys...)
+	} else {
+		share, err = g.ShareInfo.decryptShare(keys...)
+	}
 	if err != nil {
-		return fmt.Errorf("TSS group recovery failed to parse chaincode: %v", err)
+		return nil, err
 	}
+	return buildShare(share, g.ShareInfo.ShareID)
+}
 
-	switch curveType {
-	case crypto.SECP256K1:
-		privateKey, err := shares.ReconstructECDSAKey(threshold, crypto.S256())
-		if err != nil {
-			return fmt.Errorf("TSS group recovery failed to reconstruct root private key: %v", err)
-		}
-		extPrivateKey := crypto.CreateECDSAExtendedPrivateKey(privateKey, chainCode)
-		if isShowPrivate {
-			log.Println("Reconstructed root private key:", utils.Encode(privateKey.D.Bytes()))
-			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
-		}
-		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-		if g.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-			return fmt.Errorf("reconstructed root extended public key mismatch")
-		}
-	case crypto.ED25519:
-		privateKey, err := shares.ReconstructEDDSAKey(threshold, crypto.Edwards())
-		if err != nil {
-			log.Fatalf("TSS group recovery failed to reconstruct root private key: %v", err)
-		}
-		extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)
-		if isShowPrivate {
-			log.Println("Reconstructed root private key:", utils.Encode(privateKey.GetD().Bytes()))
-			log.Println("Reconstructed root extended private key:", extPrivateKey.String())
-		}
-		log.Println("Reconstructed root extended public key:", extPrivateKey.PublicKey().String())
-		if g.RootExtendedPubKey != extPrivateKey.PublicKey().String() {
-			return fmt.Errorf("reconstructed root extended public key mismatch")
-		}
-	default:
-		return fmt.Errorf("not supported curve type: %v", curveType)
+func (g *Group) VerifyRootPrivateKey(shares Shares) error {
+	if g.GroupInfo == nil {
+		return fmt.Errorf("group info is empty")
 	}
+	builder, err := NewGroupKeyBuilder(crypto.CurveNameType[g.GroupInfo.Curve])
+	if err != nil {
+		return err
+	}
+	_, err = g.GroupInfo.reconstructRootPrivateKey(builder, shares)
+	return err
+}
 
-	return nil
+func (g *Group) ReconstructRootPrivateKey(shares Shares) (crypto.CKDKey, error) {
+	if g.GroupInfo == nil {
+		return nil, fmt.Errorf("group info is empty")
+	}
+	builder, err := NewGroupKeyBuilder(crypto.CurveNameType[g.GroupInfo.Curve])
+	if err != nil {
+		return nil, err
+	}
+	return g.GroupInfo.reconstructRootPrivateKey(builder, shares)
 }

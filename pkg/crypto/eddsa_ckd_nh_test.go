@@ -137,22 +137,23 @@ func testPrivateKey(t *testing.T, vector testKey) {
 
 	cc, err := utils.Decode(vector.chaincode)
 	assert.NoError(t, err)
-	extPrivKey := CreateEDDSAExtendedPrivateKey(privKey, cc)
+	ext := CreateEDDSAExtendedPrivateKey(privKey, cc)
 
-	assert.Equal(t, vector.extPrivKey, extPrivKey.String())
-	assert.Equal(t, vector.extPubKey, extPrivKey.PublicKey().String())
+	assert.Equal(t, vector.extPrivKey, ext.String())
+	assert.Equal(t, vector.extPubKey, ext.PublicKey().String())
 
 	extPubKey := CreateEDDSAExtendedPublicKey(privKey.PubKey(), cc)
 	assert.Equal(t, vector.extPubKey, extPubKey.String())
 
+	var extPrivKey CKDKey = ext
 	// Iterate over the entire child chain and test the given keys
 	for _, testChildKey := range vector.children {
 		// Get the private key at the given key tree path
 		extPrivKey, err = extPrivKey.NewChildKey(testChildKey.pathFragment)
 		assert.NoError(t, err)
-		assert.Equal(t, testChildKey.hexPrivKey, utils.Encode(extPrivKey.Key))
-		assert.Equal(t, testChildKey.hexPubkey, utils.Encode(extPrivKey.PublicKey().Key))
-		assert.Equal(t, testChildKey.chaincode, utils.Encode(extPrivKey.ChainCode))
+		assert.Equal(t, testChildKey.hexPrivKey, utils.Encode(extPrivKey.GetKey()))
+		assert.Equal(t, testChildKey.hexPubkey, utils.Encode(extPrivKey.PublicKey().GetKey()))
+		assert.Equal(t, testChildKey.chaincode, utils.Encode(extPrivKey.GetChainCode()))
 		assert.Equal(t, testChildKey.extPrivKey, extPrivKey.String())
 		assert.Equal(t, testChildKey.extPubKey, extPrivKey.PublicKey().String())
 
@@ -173,23 +174,24 @@ func testPublicKey(t *testing.T, vector testKey) {
 	pub, err := DecompressEDDSAPubKey(pubBytes)
 	assert.NoError(t, err)
 
-	extPubKey := CreateEDDSAExtendedPublicKey(pub, cc)
-	assert.Equal(t, vector.extPubKey, extPubKey.String())
+	ext := CreateEDDSAExtendedPublicKey(pub, cc)
+	assert.Equal(t, vector.extPubKey, ext.String())
 
+	var extPubKey CKDKey = ext
 	// Iterate over the entire child chain and test the given keys
 	for _, testChildKey := range vector.children {
 		// Get the private key at the given key tree path
 		extPubKey, err = extPubKey.NewChildKey(testChildKey.pathFragment)
 		assert.NoError(t, err)
-		assert.Equal(t, testChildKey.hexPubkey, utils.Encode(extPubKey.Key))
-		assert.Equal(t, testChildKey.chaincode, utils.Encode(extPubKey.ChainCode))
+		assert.Equal(t, testChildKey.hexPubkey, utils.Encode(extPubKey.GetKey()))
+		assert.Equal(t, testChildKey.chaincode, utils.Encode(extPubKey.GetChainCode()))
 		assert.Equal(t, testChildKey.extPubKey, extPubKey.String())
 
 		assertKeySerialization(t, extPubKey.PublicKey(), testChildKey.extPubKey)
 	}
 }
 
-func assertKeySerialization(t *testing.T, key *EDDSAExtendedKey, knownBase58 string) {
+func assertKeySerialization(t *testing.T, key CKDKey, knownBase58 string) {
 	t.Helper()
 	serializedBase58 := key.B58Serialize()
 	assert.Equal(t, knownBase58, serializedBase58)

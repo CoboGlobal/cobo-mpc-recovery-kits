@@ -27,10 +27,13 @@ func InitCmd() {
 func AddFlag() {
 	rootCmd.Flags().StringSliceVar(&GroupFiles, "group-recovery-files", []string{},
 		"TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2")
-	rootCmd.MarkFlagRequired("group-recovery-files")
+	if err := rootCmd.MarkFlagRequired("group-recovery-files"); err != nil {
+		log.Fatal(err)
+	}
 	rootCmd.Flags().StringVar(&GroupID, "group-id", "", "recovery group id")
-	rootCmd.MarkFlagRequired("group-id")
-
+	if err := rootCmd.MarkFlagRequired("group-id"); err != nil {
+		log.Fatal(err)
+	}
 	rootCmd.Flags().BoolVar(&ShowRootPrivate, "show-root-private-key", false, "show TSS root private key")
 	rootCmd.Flags().StringSliceVar(&Paths, "paths", []string{}, "key HD derivation paths")
 	rootCmd.Flags().StringVar(&Csv, "csv-file", "",
@@ -40,9 +43,13 @@ func AddFlag() {
 
 	verifyCmd.Flags().StringSliceVar(&GroupFiles, "group-recovery-files", []string{},
 		"TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2")
-	verifyCmd.MarkFlagRequired("group-recovery-files")
+	if err := verifyCmd.MarkFlagRequired("group-recovery-files"); err != nil {
+		log.Fatal(err)
+	}
 	verifyCmd.Flags().StringVar(&GroupID, "group-id", "", "recovery group id")
-	verifyCmd.MarkFlagRequired("group-id")
+	if err := verifyCmd.MarkFlagRequired("group-id"); err != nil {
+		log.Fatal(err)
+	}
 }
 
 var rootCmd = &cobra.Command{
@@ -67,4 +74,12 @@ func Execute() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func checkFlags() error {
+	if len(Paths) > 0 && Csv != "" {
+		return fmt.Errorf("flags 'paths' and 'csv' at same time is not allowed")
+	}
+
+	return nil
 }

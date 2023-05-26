@@ -79,7 +79,7 @@ func NewEDDSAExtendedKey(key []byte, chainCode []byte, isPrivate bool) *EDDSAExt
 }
 
 // NewChildKey derives a child key from a given parent as outlined by bip32.
-func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (*EDDSAExtendedKey, error) {
+func (key *EDDSAExtendedKey) NewChildKey(childIdx uint32) (CKDKey, error) {
 	// Fail early if trying to create hardened child from public key
 	if childIdx >= FirstHardenedChild {
 		return nil, ErrHardnedChildKey
@@ -179,7 +179,7 @@ func (key *EDDSAExtendedKey) getIntermediary(childIdx uint32) ([]byte, error) {
 
 // PublicKey returns the public version of key or return a copy
 // The 'Neuter' function from the bip32 spec.
-func (key *EDDSAExtendedKey) PublicKey() *EDDSAExtendedKey {
+func (key *EDDSAExtendedKey) PublicKey() CKDKey {
 	keyBytes := key.Key
 
 	if key.IsPrivate {
@@ -243,8 +243,24 @@ func (key *EDDSAExtendedKey) String() string {
 	return key.B58Serialize()
 }
 
+func (key *EDDSAExtendedKey) IsPrivateKey() bool {
+	return key.IsPrivate
+}
+
+func (key *EDDSAExtendedKey) GetKey() []byte {
+	return key.Key
+}
+
+func (key *EDDSAExtendedKey) GetChainCode() []byte {
+	return key.ChainCode
+}
+
+func (key *EDDSAExtendedKey) GetType() KeyType {
+	return EDDSAKey
+}
+
 // Deserialize a byte slice into a EDDSAExtendedKey.
-func Deserialize(data []byte) (*EDDSAExtendedKey, error) {
+func Deserialize(data []byte) (CKDKey, error) {
 	if len(data) != 82 {
 		return nil, ErrSerializedKeyWrongSize
 	}
@@ -281,7 +297,7 @@ func Deserialize(data []byte) (*EDDSAExtendedKey, error) {
 }
 
 // B58Deserialize deserializes a EDDSAExtendedKey encoded in base58 encoding.
-func B58Deserialize(data string) (*EDDSAExtendedKey, error) {
+func B58Deserialize(data string) (CKDKey, error) {
 	b, err := base58Decode(data)
 	if err != nil {
 		return nil, err
