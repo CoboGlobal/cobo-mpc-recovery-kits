@@ -175,7 +175,7 @@ linters:
     # - gomoddirectives
     - gomodguard
     - goprintffuncname
-#    - gosec
+    - gosec
     - gosimple
     - govet
     - grouper

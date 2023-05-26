@@ -8,6 +8,19 @@ on:
 
 jobs:
 
+  security_scan:
+    name: GoSec Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
   CI-ubuntu-latest:
     runs-on: ubuntu-latest
     steps:

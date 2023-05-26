@@ -1,13 +1,8 @@
 package tss
 
 import (
-	"crypto/ecdsa"
 	"crypto/elliptic"
-	"fmt"
 	"math/big"
-
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
-	"github.com/decred/dcrd/dcrec/edwards/v2"
 )
 
 type (
@@ -59,34 +54,4 @@ func (shares Shares) reconstruct(curve elliptic.Curve) (*big.Int, error) {
 		secret = sAdd.Mod(sAdd, n)
 	}
 	return secret, nil
-}
-
-func (shares Shares) ReconstructECDSAKey(threshold int, curve elliptic.Curve) (*ecdsa.PrivateKey, error) {
-	if shares == nil || threshold < 1 {
-		return nil, fmt.Errorf("input error")
-	}
-	if threshold > len(shares) {
-		return nil, fmt.Errorf("too little shares for threshold to reconstruct")
-	}
-	secret, err := shares.reconstruct(curve)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.CreateECDSAPrivateKey(curve, secret), nil
-}
-
-func (shares Shares) ReconstructEDDSAKey(threshold int, curve elliptic.Curve) (*edwards.PrivateKey, error) {
-	if shares == nil || threshold < 1 {
-		return nil, fmt.Errorf("input error")
-	}
-	if threshold > len(shares) {
-		return nil, fmt.Errorf("too little shares for threshold to reconstruct")
-	}
-	secret, err := shares.reconstruct(curve)
-	if err != nil {
-		return nil, err
-	}
-
-	return crypto.CreateEDDSAPrivateKey(secret)
 }

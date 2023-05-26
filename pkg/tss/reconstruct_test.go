@@ -47,11 +47,11 @@ func TestReconstructPrivateKey(t *testing.T) {
 	}
 	shares = append(shares, share1)
 	shares = append(shares, share2)
-	private, err := shares.ReconstructECDSAKey(2, crypto.S256())
+	private, err := shares.reconstruct(crypto.S256())
 	if err != nil {
 		t.Fatalf("reconstructKey failed: %v", err)
 	}
-	if !bytes.Equal(private.D.Bytes(), d.Bytes()) {
+	if !bytes.Equal(private.Bytes(), d.Bytes()) {
 		t.Fatalf("private error")
 	}
 }
