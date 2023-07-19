@@ -61,9 +61,9 @@ func recovery() {
 			if err != nil {
 				log.Fatalf("Unmarshal group failed: %v", err)
 			}
-			for _, g := range groups {
-				if GroupID == g.GroupInfo.ID {
-					group = &g
+			for i := range groups {
+				if GroupID == groups[i].GroupInfo.ID {
+					group = &groups[i]
 					break
 				}
 			}
