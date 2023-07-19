@@ -31,6 +31,7 @@ type AddressInfo struct {
 	ChildPubKey string
 }
 
+//nolint:gocognit
 func recovery() {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
@@ -55,11 +56,20 @@ func recovery() {
 		group := &tss.Group{}
 		err = json.Unmarshal(groupBytes, group)
 		if err != nil {
-			log.Fatalf("Unmarshal group from recovery file %v failed: %v", groupFile, err)
+			groups := make([]tss.Group, 0)
+			err = json.Unmarshal(groupBytes, &groups)
+			if err != nil {
+				log.Fatalf("Unmarshal group failed: %v", err)
+			}
+			for _, g := range groups {
+				if GroupID == g.GroupInfo.ID {
+					group = &g
+					break
+				}
+			}
 		}
-
-		if GroupID != group.GroupInfo.ID {
-			log.Fatalln("Group ID mismatch")
+		if group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
+			log.Fatalf("Not found group %v from group recovery file", GroupID)
 		}
 
 		if err := group.CheckGroupParams(); err != nil {
