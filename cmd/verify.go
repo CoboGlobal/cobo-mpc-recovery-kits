@@ -22,6 +22,7 @@ var verifyCmd = &cobra.Command{
 	},
 }
 
+//nolint:gocognit
 func verifyShare() {
 	if len(GroupFiles) == 0 {
 		log.Fatal("no group recovery files")
@@ -46,11 +47,20 @@ func verifyShare() {
 		group := &tss.Group{}
 		err = json.Unmarshal(groupBytes, group)
 		if err != nil {
-			log.Fatalln("Unmarshal group failed:", err)
+			groups := make([]tss.Group, 0)
+			err = json.Unmarshal(groupBytes, &groups)
+			if err != nil {
+				log.Fatalf("Unmarshal group failed: %v", err)
+			}
+			for _, g := range groups {
+				if GroupID == g.GroupInfo.ID {
+					group = &g
+					break
+				}
+			}
 		}
-
-		if GroupID != group.GroupInfo.ID {
-			log.Fatalln("Group ID mismatch")
+		if group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
+			log.Fatalf("Not found group %v from group recovery file", GroupID)
 		}
 
 		if err := group.CheckGroupParams(); err != nil {
