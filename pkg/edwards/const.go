@@ -7,7 +7,7 @@ package edwards
 import (
 	"math/big"
 
-	"github.com/agl/ed25519/edwards25519"
+	"filippo.io/edwards25519/field"
 )
 
 var (
@@ -25,27 +25,18 @@ var (
 	fieldIntSize = 32
 )
 
-// feOne is the field element representation of one. This is
-// also the neutral (null) element.
-var feOne = edwards25519.FieldElement{
-	1, 0, 0, 0, 0,
-	0, 0, 0, 0, 0,
-}
+// feD is a constant in the curve equation.
+var feD, _ = new(field.Element).SetBytes([]byte{
+	0xa3, 0x78, 0x59, 0x13, 0xca, 0x4d, 0xeb, 0x75,
+	0xab, 0xd8, 0x41, 0x41, 0x4d, 0x0a, 0x70, 0x00,
+	0x98, 0xe8, 0x79, 0x77, 0x79, 0x40, 0xc7, 0x8c,
+	0x73, 0xfe, 0x6f, 0x2b, 0xee, 0x6c, 0x03, 0x52})
 
-// fed is the field element representation of D.
-var fed = edwards25519.FieldElement{
-	-10913610, 13857413, -15372611, 6949391, 114729,
-	-8787816, -6275908, -3247719, -18696448, -12055116,
-}
+var feOne = new(field.Element).One()
 
-// fed2 is the field element representation of D^2.
-var fed2 = edwards25519.FieldElement{
-	-21827239, -5839606, -30745221, 13898782, 229458,
-	15978800, -12551817, -6495438, 29715968, 9444199,
-}
-
-// feI is the field element representation of I.
-var feI = edwards25519.FieldElement{
-	-32595792, -7943725, 9377950, 3500415, 12389472,
-	-272473, -25146209, -2005654, 326686, 11406482,
-}
+// sqrtM1 is 2^((p-1)/4), which squared is equal to -1 by Euler's Criterion.
+var sqrtM1, _ = new(field.Element).SetBytes([]byte{
+	0xb0, 0xa0, 0x0e, 0x4a, 0x27, 0x1b, 0xee, 0xc4,
+	0x78, 0xe4, 0x2f, 0xad, 0x06, 0x18, 0x43, 0x2f,
+	0xa7, 0xd7, 0xfb, 0x3d, 0x99, 0x00, 0x4d, 0x2b,
+	0x0b, 0xdf, 0xc1, 0x4f, 0x80, 0x24, 0x83, 0x2b})

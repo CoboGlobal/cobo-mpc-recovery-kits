@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/decred/dcrd/dcrec/edwards/v2"
+	"github.com/cobo/cobo-mpc-recovery-kits/pkg/edwards"
 )
 
 // The functions below do not implement the full BIP-32 specification.

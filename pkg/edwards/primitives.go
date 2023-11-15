@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/agl/ed25519/edwards25519"
+	"filippo.io/edwards25519"
+	"filippo.io/edwards25519/field"
 )
 
 // Some notes on primitives in Ed25519:
@@ -144,10 +145,12 @@ func bigIntToEncodedBytesNoReverse(a *big.Int) *[32]byte {
 
 // bigIntToFieldElement converts a big little endian integer into its corresponding
 // 40 byte field representation.
-func bigIntToFieldElement(a *big.Int) *edwards25519.FieldElement {
+func bigIntToFieldElement(a *big.Int) *field.Element {
 	aB := bigIntToEncodedBytes(a)
-	fe := new(edwards25519.FieldElement)
-	edwards25519.FeFromBytes(fe, aB)
+	fe, err := new(field.Element).SetBytes(aB[:])
+	if err != nil {
+		return nil
+	}
 	return fe
 }
 
@@ -156,9 +159,11 @@ func bigIntToFieldElement(a *big.Int) *edwards25519.FieldElement {
 func bigIntPointToEncodedBytes(x *big.Int, y *big.Int) *[32]byte {
 	s := bigIntToEncodedBytes(y)
 	xB := bigIntToEncodedBytes(x)
-	xFE := new(edwards25519.FieldElement)
-	edwards25519.FeFromBytes(xFE, xB)
-	isNegative := edwards25519.FeIsNegative(xFE) == 1
+	xFE, err := new(field.Element).SetBytes(xB[:])
+	if err != nil {
+		return nil
+	}
+	isNegative := xFE.IsNegative() == 1
 
 	if isNegative {
 		s[31] |= (1 << 7)
@@ -189,17 +194,19 @@ func encodedBytesToBigInt(s *[32]byte) *big.Int {
 // affine x and y coordinates, and returns whether or not the x value
 // returned is negative.
 func (curve *TwistedEdwardsCurve) extendedToBigAffine(xi, yi,
-	zi *edwards25519.FieldElement) (*big.Int, *big.Int, bool) {
-	var recip, x, y edwards25519.FieldElement
+	zi *field.Element) (*big.Int, *big.Int, bool) {
+	recip := new(field.Element)
+	x := new(field.Element)
+	y := new(field.Element)
 
 	// Normalize to Z=1.
-	edwards25519.FeInvert(&recip, zi)
-	edwards25519.FeMul(&x, xi, &recip)
-	edwards25519.FeMul(&y, yi, &recip)
+	recip = recip.Invert(zi)
+	x = x.Multiply(xi, recip)
+	y = y.Multiply(yi, recip)
 
-	isNegative := edwards25519.FeIsNegative(&x) == 1
+	isNegative := x.IsNegative() == 1
 
-	return fieldElementToBigInt(&x), fieldElementToBigInt(&y), isNegative
+	return fieldElementToBigInt(x), fieldElementToBigInt(y), isNegative
 }
 
 // EncodedBytesToBigIntPoint converts a 32 byte representation of a point
@@ -212,13 +219,14 @@ func (curve *TwistedEdwardsCurve) encodedBytesToBigIntPoint(s *[32]byte) (*big.I
 	}
 
 	xIsNegBytes := sCopy[31]>>7 == 1
-	p := new(edwards25519.ExtendedGroupElement)
-	if !p.FromBytes(sCopy) {
-		return nil, nil, fmt.Errorf("point not on curve")
+	p, err := new(edwards25519.Point).SetBytes(sCopy[:])
+	if err != nil {
+		return nil, nil, fmt.Errorf("point not on curve: %w", err)
 	}
 
 	// Normalize the X and Y coordinates in affine space.
-	x, y, isNegative := curve.extendedToBigAffine(&p.X, &p.Y, &p.Z)
+	xi, yi, zi, _ := p.ExtendedCoordinates()
+	x, y, isNegative := curve.extendedToBigAffine(xi, yi, zi)
 
 	// We got the wrong sign; flip the bit and recalculate.
 	if xIsNegBytes != isNegative {
@@ -237,16 +245,19 @@ func (curve *TwistedEdwardsCurve) encodedBytesToBigIntPoint(s *[32]byte) (*big.I
 
 // encodedBytesToFieldElement converts a 32 byte little endian integer into
 // a field element.
-func encodedBytesToFieldElement(s *[32]byte) *edwards25519.FieldElement {
-	fe := new(edwards25519.FieldElement)
-	edwards25519.FeFromBytes(fe, s)
+func encodedBytesToFieldElement(s *[32]byte) *field.Element {
+	fe, err := new(field.Element).SetBytes(s[:])
+	if err != nil {
+		return nil
+	}
 	return fe
 }
 
 // fieldElementToBigInt converts a 40 byte field element into a big int.
-func fieldElementToBigInt(fe *edwards25519.FieldElement) *big.Int {
+func fieldElementToBigInt(fe *field.Element) *big.Int {
 	s := new([32]byte)
-	edwards25519.FeToBytes(s, fe)
+	feB := fe.Bytes()
+	copy(s[:], feB)
 	reverse(s)
 
 	aBI := new(big.Int).SetBytes(s[:])
@@ -256,9 +267,10 @@ func fieldElementToBigInt(fe *edwards25519.FieldElement) *big.Int {
 
 // fieldElementToEncodedBytes converts a 40 byte field element into a 32 byte
 // little endian integer.
-func fieldElementToEncodedBytes(fe *edwards25519.FieldElement) *[32]byte {
+func fieldElementToEncodedBytes(fe *field.Element) *[32]byte {
 	s := new([32]byte)
-	edwards25519.FeToBytes(s, fe)
+	feB := fe.Bytes()
+	copy(s[:], feB)
 	return s
 }
 

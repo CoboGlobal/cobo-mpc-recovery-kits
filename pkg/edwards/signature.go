@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/agl/ed25519"
+	"crypto/ed25519"
 )
 
 // Signature is a type representing an ecdsa signature.
@@ -60,7 +60,7 @@ func (sig *Signature) Verify(hash []byte, pubKey *PublicKey) bool {
 	sigBytes := sig.Serialize()
 	pubArray := copyBytes(pubBytes)
 	sigArray := copyBytes64(sigBytes)
-	return ed25519.Verify(pubArray, hash, sigArray)
+	return ed25519.Verify(pubArray[:], hash, sigArray[:])
 }
 
 // parseSig is the default method of parsing a serialized Ed25519 signature.

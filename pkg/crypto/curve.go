@@ -3,7 +3,7 @@ package crypto
 import (
 	"crypto/elliptic"
 
-	"github.com/decred/dcrd/dcrec/edwards/v2"
+	"github.com/cobo/cobo-mpc-recovery-kits/pkg/edwards"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 

@@ -8,7 +8,8 @@ import (
 	"crypto/elliptic"
 	"math/big"
 
-	"github.com/agl/ed25519/edwards25519"
+	"filippo.io/edwards25519"
+	"filippo.io/edwards25519/field"
 )
 
 // TwistedEdwardsCurve extended an elliptical curve set of
@@ -77,21 +78,21 @@ func (curve *TwistedEdwardsCurve) recoverXBigInt(xIsNeg bool, y *big.Int) *big.I
 // recoverXFieldElement recovers the X value for some Y value, for a coordinate
 // on the Ed25519 curve given as a field element. Y value. Probably the fastest
 // way to get your respective X from Y.
-func (curve *TwistedEdwardsCurve) recoverXFieldElement(xIsNeg bool, y *edwards25519.FieldElement) *edwards25519.FieldElement {
+func (curve *TwistedEdwardsCurve) recoverXFieldElement(xIsNeg bool, y *field.Element) *field.Element {
 	// (y^2 - 1)
-	l := new(edwards25519.FieldElement)
-	edwards25519.FeSquare(l, y)
-	edwards25519.FeSub(l, l, &feOne)
+	l := new(field.Element)
+	l = l.Square(y)
+	l = l.Subtract(l, feOne)
 
 	// inv(d*y^2+1)
-	r := new(edwards25519.FieldElement)
-	edwards25519.FeSquare(r, y)
-	edwards25519.FeMul(r, r, &fed)
-	edwards25519.FeAdd(r, r, &feOne)
-	edwards25519.FeInvert(r, r)
+	r := new(field.Element)
+	r = r.Square(y)
+	r = r.Multiply(r, feD)
+	r = r.Add(r, feOne)
+	r = r.Invert(r)
 
-	x2 := new(edwards25519.FieldElement)
-	edwards25519.FeMul(x2, r, l)
+	x2 := new(field.Element)
+	x2 = x2.Multiply(r, l)
 
 	// Get a big int so we can do the exponentiation.
 	x2Big := fieldElementToBigInt(x2)
@@ -106,16 +107,16 @@ func (curve *TwistedEdwardsCurve) recoverXFieldElement(xIsNeg bool, y *edwards25
 	x := bigIntToFieldElement(xBig)
 
 	// check (x^2 - x2) % q != 0
-	x22 := new(edwards25519.FieldElement)
-	edwards25519.FeSquare(x22, x)
-	xsub := new(edwards25519.FieldElement)
-	edwards25519.FeSub(xsub, x22, x2)
+	x22 := new(field.Element)
+	x22 = x22.Square(x)
+	xsub := new(field.Element)
+	xsub = xsub.Subtract(x22, x2)
 	xsubBig := fieldElementToBigInt(xsub)
 	xsubBig.Mod(xsubBig, curve.P)
 
 	if xsubBig.Cmp(zero) != 0 {
-		xi := new(edwards25519.FieldElement)
-		edwards25519.FeMul(xi, x, &feI)
+		xi := new(field.Element)
+		xi = xi.Multiply(x, sqrtM1)
 		xiModBig := fieldElementToBigInt(xi)
 		xiModBig.Mod(xiModBig, curve.P)
 		xiMod := bigIntToFieldElement(xiModBig)
@@ -132,9 +133,9 @@ func (curve *TwistedEdwardsCurve) recoverXFieldElement(xIsNeg bool, y *edwards25
 	}
 
 	// We got the wrong x, negate it to get the right one.
-	isNegative := edwards25519.FeIsNegative(x) == 1
+	isNegative := x.IsNegative() == 1
 	if xIsNeg != isNegative {
-		edwards25519.FeNeg(x, x)
+		x = x.Negate(x)
 	}
 
 	return x
@@ -147,24 +148,28 @@ func (curve *TwistedEdwardsCurve) IsOnCurve(x *big.Int, y *big.Int) bool {
 	xB := bigIntToEncodedBytes(x)
 	yB := bigIntToEncodedBytes(y)
 
-	yfe := new(edwards25519.FieldElement)
-	xfe := new(edwards25519.FieldElement)
-	edwards25519.FeFromBytes(yfe, yB)
-	edwards25519.FeFromBytes(xfe, xB)
+	yfe, err := new(field.Element).SetBytes(yB[:])
+	if err != nil {
+		return false
+	}
+	xfe, err := new(field.Element).SetBytes(xB[:])
+	if err != nil {
+		return false
+	}
 
-	x2 := new(edwards25519.FieldElement)
-	edwards25519.FeSquare(x2, xfe)
-	y2 := new(edwards25519.FieldElement)
-	edwards25519.FeSquare(y2, yfe)
+	x2 := new(field.Element)
+	x2 = x2.Square(xfe)
+	y2 := new(field.Element)
+	y2 = y2.Square(yfe)
 
-	dx2y2 := new(edwards25519.FieldElement)
-	edwards25519.FeMul(dx2y2, &fed, x2)
-	edwards25519.FeMul(dx2y2, dx2y2, y2)
+	dx2y2 := new(field.Element)
+	dx2y2 = dx2y2.Multiply(feD, x2)
+	dx2y2 = dx2y2.Multiply(dx2y2, y2)
 
-	enum := new(edwards25519.FieldElement)
-	edwards25519.FeSub(enum, y2, x2)
-	edwards25519.FeSub(enum, enum, &feOne)
-	edwards25519.FeSub(enum, enum, dx2y2)
+	enum := new(field.Element)
+	enum = enum.Subtract(y2, x2)
+	enum = enum.Subtract(enum, feOne)
+	enum = enum.Subtract(enum, dx2y2)
 
 	enumBig := fieldElementToBigInt(enum)
 	enumBig.Mod(enumBig, curve.P)
@@ -180,64 +185,27 @@ func (curve *TwistedEdwardsCurve) IsOnCurve(x *big.Int, y *big.Int) bool {
 	return modEight.Cmp(zero) == 0
 }
 
-// cachedGroupElement is a cached extended group element derived from
-// another extended group element, for use in computation.
-type cachedGroupElement struct {
-	yPlusX, yMinusX, Z, T2d edwards25519.FieldElement
-}
-
-// toCached converts an extended group element to a useful intermediary
-// containing precalculated values.
-func toCached(r *cachedGroupElement, p *edwards25519.ExtendedGroupElement) {
-	edwards25519.FeAdd(&r.yPlusX, &p.Y, &p.X)
-	edwards25519.FeSub(&r.yMinusX, &p.Y, &p.X)
-	edwards25519.FeCopy(&r.Z, &p.Z)
-	edwards25519.FeMul(&r.T2d, &p.T, &fed2)
-}
-
 // Add adds two points represented by pairs of big integers on the elliptical
 // curve.
 func (curve *TwistedEdwardsCurve) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
 	// Convert to extended from affine.
-	a := bigIntPointToEncodedBytes(x1, y1)
-	aEGE := new(edwards25519.ExtendedGroupElement)
-	aEGE.FromBytes(a)
+	p := bigIntPointToEncodedBytes(x1, y1)
+	pP, err := new(edwards25519.Point).SetBytes(p[:])
+	if err != nil {
+		return nil, nil
+	}
 
-	b := bigIntPointToEncodedBytes(x2, y2)
-	bEGE := new(edwards25519.ExtendedGroupElement)
-	bEGE.FromBytes(b)
+	q := bigIntPointToEncodedBytes(x2, y2)
+	qP, err := new(edwards25519.Point).SetBytes(q[:])
+	if err != nil {
+		return nil, nil
+	}
 
-	// Cache b for use in group element addition.
-	bCached := new(cachedGroupElement)
-	toCached(bCached, bEGE)
+	rPoint := new(edwards25519.Point).Add(pP, qP)
 
-	p := aEGE
-	q := bCached
-
-	// geAdd(r*CompletedGroupElement, p*ExtendedGroupElement,
-	//   q*CachedGroupElement)
-	// r is the result.
-	r := new(edwards25519.CompletedGroupElement)
-	var t0 edwards25519.FieldElement
-
-	edwards25519.FeAdd(&r.X, &p.Y, &p.X)
-	edwards25519.FeSub(&r.Y, &p.Y, &p.X)
-	edwards25519.FeMul(&r.Z, &r.X, &q.yPlusX)
-	edwards25519.FeMul(&r.Y, &r.Y, &q.yMinusX)
-	edwards25519.FeMul(&r.T, &q.T2d, &p.T)
-	edwards25519.FeMul(&r.X, &p.Z, &q.Z)
-	edwards25519.FeAdd(&t0, &r.X, &r.X)
-	edwards25519.FeSub(&r.X, &r.Z, &r.Y)
-	edwards25519.FeAdd(&r.Y, &r.Z, &r.Y)
-	edwards25519.FeAdd(&r.Z, &t0, &r.T)
-	edwards25519.FeSub(&r.T, &t0, &r.T)
-
-	rEGE := new(edwards25519.ExtendedGroupElement)
-	r.ToExtended(rEGE)
-
+	rB := rPoint.Bytes()
 	s := new([32]byte)
-	rEGE.ToBytes(s)
-
+	copy(s[:], rB)
 	x, y, _ = curve.encodedBytesToBigIntPoint(s)
 
 	return
@@ -247,19 +215,23 @@ func (curve *TwistedEdwardsCurve) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
 // elliptical curve.
 func (curve *TwistedEdwardsCurve) Double(x1, y1 *big.Int) (x, y *big.Int) {
 	// Convert to extended projective coordinates.
-	a := bigIntPointToEncodedBytes(x1, y1)
-	aEGE := new(edwards25519.ExtendedGroupElement)
-	aEGE.FromBytes(a)
+	p := bigIntPointToEncodedBytes(x1, y1)
+	pP, err := new(edwards25519.Point).SetBytes(p[:])
+	if err != nil {
+		return nil, nil
+	}
 
-	r := new(edwards25519.CompletedGroupElement)
-	aEGE.Double(r)
-	rEGE := new(edwards25519.ExtendedGroupElement)
-	r.ToExtended(rEGE)
+	p2 := new(projP2).FromP3(pP)
+	p1xp1 := new(projP1xP1).Double(p2)
 
+	r := pointFromP1xP1(p1xp1)
+	rB := r.Bytes()
 	s := new([32]byte)
-	rEGE.ToBytes(s)
-	x, y, _ = curve.encodedBytesToBigIntPoint(s)
-
+	copy(s[:], rB)
+	x, y, err = curve.encodedBytesToBigIntPoint(s)
+	if err != nil {
+		return nil, nil
+	}
 	return
 }
 
@@ -272,8 +244,7 @@ func (curve *TwistedEdwardsCurve) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *b
 
 	// Get a new group element to do cached doubling
 	// calculations in.
-	dEGE := new(edwards25519.ExtendedGroupElement)
-	dEGE.Zero()
+	p := pointFromP2(new(projP2).Zero())
 
 	// Use the doubling method for the multiplication.
 	// p := given point
@@ -288,12 +259,12 @@ func (curve *TwistedEdwardsCurve) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *b
 	// making this variable time and thus vulnerable to
 	// side channel attack vectors.
 	for i := s.BitLen() - 1; i >= 0; i-- {
-		dCGE := new(edwards25519.CompletedGroupElement)
-		dEGE.Double(dCGE)
-		dCGE.ToExtended(dEGE)
+		p2 := new(projP2).FromP3(p)
+		p1xp1 := new(projP1xP1).Double(p2)
+		p = pointFromP1xP1(p1xp1)
 		if s.Bit(i) == 1 {
 			ss := new([32]byte)
-			dEGE.ToBytes(ss)
+			copy(ss[:], p.Bytes())
 			var err error
 			xi, yi, err := curve.encodedBytesToBigIntPoint(ss)
 			if err != nil {
@@ -301,13 +272,15 @@ func (curve *TwistedEdwardsCurve) ScalarMult(x1, y1 *big.Int, k []byte) (x, y *b
 			}
 			xAdd, yAdd := curve.Add(xi, yi, x1, y1)
 			dTempBytes := bigIntPointToEncodedBytes(xAdd, yAdd)
-			dEGE.FromBytes(dTempBytes)
+			p, err = p.SetBytes(dTempBytes[:])
+			if err != nil {
+				return nil, nil
+			}
 		}
 	}
 
 	finalBytes := new([32]byte)
-	dEGE.ToBytes(finalBytes)
-
+	copy(finalBytes[:], p.Bytes())
 	var err error
 	x, y, err = curve.encodedBytesToBigIntPoint(finalBytes)
 	if err != nil {
@@ -328,12 +301,12 @@ func (curve *TwistedEdwardsCurve) ScalarBaseMult(k []byte) (x, y *big.Int) {
 func scalarAdd(a, b *big.Int) *big.Int {
 	feA := bigIntToFieldElement(a)
 	feB := bigIntToFieldElement(b)
-	sum := new(edwards25519.FieldElement)
+	sum := new(field.Element)
 
-	edwards25519.FeAdd(sum, feA, feB)
+	sum = sum.Add(feA, feB)
 	sumArray := new([32]byte)
-	edwards25519.FeToBytes(sumArray, sum)
-
+	sumB := sum.Bytes()
+	copy(sumArray[:], sumB)
 	return encodedBytesToBigInt(sumArray)
 }
 

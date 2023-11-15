@@ -6,15 +6,15 @@ f = open("scalarmulttests.dat",'w')
 numTests = 50
 for i in range(0,numTests):
     rand_string = os.urandom(32)
-    try: 
+    try:
         p = decodepoint(rand_string)
-    except: 
+    except:
         continue
     rand_string = os.urandom(32)
     s = decodeint(rand_string)
-    
+
     mult = scalarmult(p, s)
-    
+
     f.write("ScalarMultVectorHex{")
     # Point to multiply
     f.write('\"')

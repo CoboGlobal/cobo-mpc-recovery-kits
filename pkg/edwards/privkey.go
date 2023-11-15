@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/agl/ed25519"
+	"crypto/ed25519"
 )
 
 // These constants define the lengths of serialized private keys.

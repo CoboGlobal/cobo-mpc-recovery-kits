@@ -49,7 +49,7 @@ def scalarmult(P,e):
 def encodeint(y):
   bits = [(y >> i) & 1 for i in range(b)]
   return ''.join([chr(sum([bits[i * 8 + j] << j for j in range(8)])) for i in range(b/8)])
-  
+
 def encodeinthex(y):
   encoded = encodeint(y)
   print "".join("{:02x}".format(ord(c)) for c in encoded)
@@ -59,7 +59,7 @@ def encodepoint(P):
   y = P[1]
   bits = [(y >> i) & 1 for i in range(b - 1)] + [x & 1]
   return ''.join([chr(sum([bits[i * 8 + j] << j for j in range(8)])) for i in range(b/8)])
-  
+
 def encodepointhex(P):
   encoded = encodepoint(P)
   print "".join("{:02x}".format(ord(c)) for c in encoded)
@@ -92,7 +92,7 @@ def isoncurve(P):
 
 def decodeint(s):
   return sum(2**i * bit(s,i) for i in range(0,b))
-  
+
 def decodeinthex(sH):
   s = sH.decode("hex")
   print decodeint(s)
@@ -104,7 +104,7 @@ def decodepoint(s):
   P = [x,y]
   if not isoncurve(P): raise Exception("decoding point that is not on curve")
   return P
-  
+
 def decodepointhex(sH):
   s = sH.decode("hex")
   P = decodepoint(s)

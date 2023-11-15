@@ -6,6 +6,7 @@ package edwards
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -14,8 +15,7 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/agl/ed25519"
-	"github.com/agl/ed25519/edwards25519"
+	"filippo.io/edwards25519"
 )
 
 // BIG CAVEAT
@@ -40,13 +40,12 @@ var (
 // random secret.
 func GenerateKey(rand io.Reader) (priv []byte, x, y *big.Int, err error) {
 	var pub *[PubKeyBytesLen]byte
-	var privArray *[PrivKeyBytesLen]byte
-	pub, privArray, err = ed25519.GenerateKey(rand)
+	pubKey, privKey, err := ed25519.GenerateKey(rand)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	priv = privArray[:]
-
+	priv = privKey[:]
+	copy(pub[:], pubKey)
 	x, y, err = Edwards().encodedBytesToBigIntPoint(pub)
 	if err != nil {
 		return nil, nil, nil, err
@@ -68,7 +67,7 @@ func SignFromSecret(rand io.Reader, priv *PrivateKey, hash []byte) (r, s *big.In
 func SignFromSecretNoReader(priv *PrivateKey, hash []byte) (r, s *big.Int, err error) {
 	privBytes := priv.SerializeSecret()
 	privArray := copyBytes64(privBytes)
-	sig := ed25519.Sign(privArray, hash)
+	sig := ed25519.Sign(privArray[:], hash)
 
 	// The signatures are encoded as
 	//   sig[0:32]  R, a point encoded as little endian
@@ -234,20 +233,33 @@ func bits2octets(in []byte, rolen int) []byte {
 // s = r + hash512(k || A || M) * a
 func SignFromScalar(priv *PrivateKey, nonce []byte, hash []byte) (r, s *big.Int, err error) {
 	publicKey := new([PubKeyBytesLen]byte)
-	var A edwards25519.ExtendedGroupElement
-	privateScalar := copyBytes(priv.Serialize())
-	reverse(privateScalar) // BE --> LE
-	edwards25519.GeScalarMultBase(&A, privateScalar)
-	A.ToBytes(publicKey)
+	privateKey := copyBytes(priv.Serialize())
+	curve := Edwards()
+
+	x, y := curve.ScalarBaseMult(privateKey[:])
+	p := bigIntPointToEncodedBytes(x, y)
+	copy(publicKey[:], p[:])
+
+	reverse(privateKey) // BE --> LE
+	var pWideBytes [64]byte
+	copy(pWideBytes[:], privateKey[:])
+	privateScalar, err := edwards25519.NewScalar().SetUniformBytes(pWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// For signing from a scalar, r = nonce.
-	nonceLE := copyBytes(nonce)
-	reverse(nonceLE)
-	var R edwards25519.ExtendedGroupElement
-	edwards25519.GeScalarMultBase(&R, nonceLE)
+	x, y = curve.ScalarBaseMult(nonce)
+	encodedR := bigIntPointToEncodedBytes(x, y)
 
-	var encodedR [32]byte
-	R.ToBytes(&encodedR)
+	nonceLE := copyBytes(nonce)
+	reverse(nonceLE) // BE --> LE
+	var rWideBytes [64]byte
+	copy(rWideBytes[:], nonceLE[:])
+	nonceScalar, err := edwards25519.NewScalar().SetUniformBytes(rWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// h = hash512(k || A || M)
 	h := sha512.New()
@@ -259,16 +271,18 @@ func SignFromScalar(priv *PrivateKey, nonce []byte, hash []byte) (r, s *big.Int,
 	// s = r + h * a
 	var hramDigest [64]byte
 	h.Sum(hramDigest[:0])
-	var hramDigestReduced [32]byte
-	edwards25519.ScReduce(&hramDigestReduced, &hramDigest)
+	var hWideBytes [64]byte
+	copy(hWideBytes[:], hramDigest[:])
+	hramDigestScalar, err := edwards25519.NewScalar().SetUniformBytes(hWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
 
-	var localS [32]byte
-	edwards25519.ScMulAdd(&localS, &hramDigestReduced, privateScalar,
-		nonceLE)
+	localS := edwards25519.NewScalar().MultiplyAdd(hramDigestScalar, privateScalar, nonceScalar)
 
 	signature := new([64]byte)
 	copy(signature[:], encodedR[:])
-	copy(signature[32:], localS[:])
+	copy(signature[32:], localS.Bytes()[:])
 	sigEd, err := ParseSignature(signature[:])
 	if err != nil {
 		return nil, nil, err
@@ -292,8 +306,14 @@ func SignThreshold(priv *PrivateKey, groupPub *PublicKey, hash []byte, privNonce
 		return nil, nil, fmt.Errorf("nil input")
 	}
 
-	privateScalar := copyBytes(priv.Serialize())
-	reverse(privateScalar) // BE --> LE
+	privateKey := copyBytes(priv.Serialize())
+	reverse(privateKey) // BE --> LE
+	var pWideBytes [64]byte
+	copy(pWideBytes[:], privateKey[:])
+	privateScalar, err := edwards25519.NewScalar().SetUniformBytes(pWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// Threshold variant scheme:
 	// R = K_Sum
@@ -311,19 +331,28 @@ func SignThreshold(priv *PrivateKey, groupPub *PublicKey, hash []byte, privNonce
 	h.Write(groupPub.Serialize()[:])
 	h.Write(hash)
 	h.Sum(hramDigest[:0])
-	var hramDigestReduced [32]byte
-	edwards25519.ScReduce(&hramDigestReduced, &hramDigest)
+	var hWideBytes [64]byte
+	copy(hWideBytes[:], hramDigest[:])
+	hramDigestScalar, err := edwards25519.NewScalar().SetUniformBytes(hWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// s = r + h * a
-	var localS [32]byte
 	privNonceLE := copyBytes(privNonce.Serialize())
 	reverse(privNonceLE) // BE --> LE
-	edwards25519.ScMulAdd(&localS, &hramDigestReduced, privateScalar,
-		privNonceLE)
+	var rWideBytes [64]byte
+	copy(rWideBytes[:], privNonceLE[:])
+	nonceScalar, err := edwards25519.NewScalar().SetUniformBytes(rWideBytes[:])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	localS := edwards25519.NewScalar().MultiplyAdd(hramDigestScalar, privateScalar, nonceScalar)
 
 	signature := new([64]byte)
 	copy(signature[:], encodedGroupR[:])
-	copy(signature[32:], localS[:])
+	copy(signature[32:], localS.Bytes()[:])
 	sigEd, err := ParseSignature(signature[:])
 	if err != nil {
 		return nil, nil, err
@@ -363,5 +392,5 @@ func Verify(pub *PublicKey, hash []byte, r, s *big.Int) bool {
 	sigBytes := sig.Serialize()
 	pubArray := copyBytes(pubBytes)
 	sigArray := copyBytes64(sigBytes)
-	return ed25519.Verify(pubArray, hash, sigArray)
+	return ed25519.Verify(pubArray[:], hash, sigArray[:])
 }
