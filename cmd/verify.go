@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
 	"github.com/cobo/cobo-mpc-recovery-kits/pkg/tss"
@@ -14,7 +15,7 @@ import (
 
 var verifyCmd = &cobra.Command{
 	Use:   "verify",
-	Short: "verify command to reconstruct root public key by share public keys and verify TSS group recovery files parameters",
+	Short: "Reconstruct root public key by share public keys and verify TSS recovery group files parameters",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Version: " + version.TextVersion() + "\n")
@@ -25,7 +26,7 @@ var verifyCmd = &cobra.Command{
 //nolint:gocognit
 func verifyShare() {
 	if len(GroupFiles) == 0 {
-		log.Fatal("no group recovery files")
+		log.Fatal("no recovery group files")
 	}
 	if GroupID == "" {
 		log.Fatal("nil group ID")
@@ -35,32 +36,40 @@ func verifyShare() {
 	for _, groupFile := range GroupFiles {
 		_, err := os.Stat(groupFile)
 		if err != nil {
-			log.Fatalln("Group recovery file error:", err)
+			log.Fatalln("Recovery group file error:", err)
 		}
-		log.Printf("Start to verify group recovery file %v", groupFile)
+		log.Printf("Start to verify recovery group file %v", groupFile)
 
-		groupBytes, err := os.ReadFile(groupFile) //#nosec G304
+		groupBytes, err := os.ReadFile(filepath.Clean(groupFile))
 		if err != nil {
-			log.Fatalln("Read group recovery file failed:", err)
+			log.Fatalln("Read recovery group file failed:", err)
 		}
 
-		group := &tss.Group{}
-		err = json.Unmarshal(groupBytes, group)
-		if err != nil {
-			groups := make([]tss.Group, 0)
-			err = json.Unmarshal(groupBytes, &groups)
-			if err != nil {
-				log.Fatalf("Unmarshal group failed: %v", err)
-			}
-			for i := range groups {
-				if GroupID == groups[i].GroupInfo.ID {
-					group = &groups[i]
-					break
-				}
+		var groups []*tss.Group
+		rSecrets := tss.RecoverySecrets{RecoveryGroups: make([]*tss.Group, 0)}
+		rGroups := make([]*tss.Group, 0)
+		var rGroup tss.Group
+		if err := json.Unmarshal(groupBytes, &rSecrets); err == nil && len(rSecrets.RecoveryGroups) > 0 {
+			groups = rSecrets.RecoveryGroups
+		} else if err := json.Unmarshal(groupBytes, &rGroups); err == nil && len(rGroups) > 0 {
+			groups = rGroups
+		} else if err := json.Unmarshal(groupBytes, &rGroup); err == nil {
+			rGroups = append(rGroups, &rGroup)
+			groups = rGroups
+		} else {
+			log.Fatalf("Cannot parse recovery group file: %v", groupFile)
+		}
+
+		var group *tss.Group
+		for i := range groups {
+			if GroupID == groups[i].GroupInfo.ID {
+				group = groups[i]
+				break
 			}
 		}
-		if group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
-			log.Fatalf("Not found group %v from group recovery file", GroupID)
+
+		if group == nil || group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
+			log.Fatalf("Not found group %v from recovery group file", GroupID)
 		}
 
 		if err := group.CheckGroupParams(); err != nil {
@@ -93,8 +102,8 @@ func verifyShare() {
 			log.Fatalln("Verify share public key failed:", err)
 		}
 		log.Printf("Verify to derive share public key from share secret passed!")
-		log.Printf("Verify group recovery file %v passed!", groupFile)
+		log.Printf("Verify recovery group file %v passed!", groupFile)
 		log.Printf("=======================================")
 	}
-	log.Printf("Verify all group recovery files passed!")
+	log.Printf("Verify all recovery group files passed!")
 }

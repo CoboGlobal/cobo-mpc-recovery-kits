@@ -25,6 +25,10 @@ type GroupKeyBuilder interface {
 	ReconstructPrivateKey(shares Shares, threshold int, chainCode []byte) (crypto.CKDKey, error)
 }
 
+type RecoverySecrets struct {
+	RecoveryGroups []*Group `json:"recovery_groups,omitempty"`
+}
+
 type Group struct {
 	Version   int32      `json:"version"`
 	GroupInfo *GroupInfo `json:"group_info"`

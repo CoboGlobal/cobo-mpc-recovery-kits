@@ -9,7 +9,7 @@ Binary archives are published at https://github.com/CoboCustody/cobo-mpc-recover
 
 Building binary from the source in local environment, instead of using published binary archives
 
-* Go 1.18 is required. Manually install Go, please [click here](https://go.dev/doc/install)
+* Go 1.21 is required. Manually install Go, please [click here](https://go.dev/doc/install)
 
 * Clone the repository:
 
@@ -31,56 +31,70 @@ Binary executable found in the `build` directory
 
 ### Recovery command
 
-Reconstruct all MPC key shares in TSS group recovery files, and derive the child private keys of all wallet addresses under the Cobo MPC wallet
+Reconstruct all MPC key shares in TSS recovery group files, and derive the child private keys of all wallet addresses under the Cobo MPC wallet
 
 ```
 cobo-mpc-recovery-tool [flags]
 ```
-|         flags         | Description                                                                                             |
-|:---------------------:|---------------------------------------------------------------------------------------------------------|
-|       csv-file        | address csv file, contains HD derivation paths                                                          |
-|    csv-output-dir     | address csv output dir, derive keys file output in this directory (default "recovery")                  |
-|       group-id        | recovery group id                                                                                       |
-| group-recovery-files  | TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2 |
-|         paths         | key HD derivation paths                                                                                 |
-| show-root-private-key | show TSS root private key                                                                               |
+|         flags         | Description                                                                                                   |
+|:---------------------:|---------------------------------------------------------------------------------------------------------------|
+|       csv-file        | address csv file, contains HD derivation paths                                                                |
+|    csv-output-dir     | address csv output dir, derive keys file output in this directory (default "recovery")                        |
+|       group-id        | recovery group id                                                                                             |
+| recovery-group-files  | TSS recovery group files, such as recovery/recovery-secrets-node1-time1,recovery/recovery-secrets-node2-time2 |
+|         paths         | key HD derivation paths                                                                                       |
+| show-root-private-key | show TSS root private key                                                                                     |
 
 ### Verify command
 
-Verify all TSS group recovery files are valid
+Verify all TSS recovery group files are valid
 
 ```
 cobo-mpc-recovery-tool verify [flags]
 ```
 
-|        flags         | Description                                                                                             |
-|:--------------------:|---------------------------------------------------------------------------------------------------------|
-|       group-id       | recovery group id                                                                                       |
-| group-recovery-files | TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2 |
+|        flags         | Description                                                                                                   |
+|:--------------------:|---------------------------------------------------------------------------------------------------------------|
+|       group-id       | recovery group id                                                                                             |
+| recovery-group-files | TSS recovery group files, such as recovery/recovery-secrets-node1-time1,recovery/recovery-secrets-node2-time2 |
+
+### Derive command
+
+Derive the child public key and addresses based on the paths and token
+
+```
+cobo-mpc-recovery-tool derive [flags]
+```
+
+| flags | Description             |
+|:-----:|-------------------------|
+|  key  | extended root key       |
+| paths | key HD derivation paths |
+| token | token                   |
 
 ## Running
 
 * Prerequisites
 
-  * Acquire TSS group recovery files (JSON format) that contain exported MPC key shares.
-  * Passphrase of each TSS group recovery file
+  * Acquire TSS recovery group files (JSON format) that contain exported MPC key shares.
+  * Passphrase of each TSS recovery group file
 
-* Create a new recovery folder in the same directory level as `cobo-mpc-recovery-tool`, and paste the TSS group recovery files
+* Create a new recovery folder in the same directory level as `cobo-mpc-recovery-tool`, and paste the TSS recovery group files
 under the recovery folder
 
 ```
 ├── cobo-mpc-recovery-tool
 └── recovery
-    ├── tss-group-<GROUP_ID>-node-<NODE_ID1>-recovery-<TIME1>
-    └── tss-group-<GROUP_ID>-node-<NODE_ID2>-recovery-<TIME2>
+    ├── recovery-secrets-<nodeID1>-<time1>
+    └── recovery-secrets-<nodeID2>-<time2>
 ```
 
 * Execute the verify command
 
 ```
 ./cobo-mpc-recovery-tool verify \
-    --group-recovery-files recovery/tss-group-<GROUP_ID>-node-<NODE_ID1>-recovery-<TIME1>,recovery/tss-group-<GROUP_ID>-node-<NODE_ID2>-recovery-<TIME2> \
-    --group-id <GROUP_ID>
+    --recovery-group-files recovery/recovery-secrets-<nodeID1>-<time1>,recovery/recovery-secrets-<nodeID2>-<time2> \
+    --group-id <groupID>
 ```
 
 * (Optional) Locate the address.csv file after manually exporting the address information from Cobo Custody Web.
@@ -89,8 +103,8 @@ Please paste address.csv under the recovery folder
 ├── cobo-mpc-recovery-tool
 └── recovery
     ├── address.csv
-    ├── tss-group-<GROUP_ID>-node-<NODE_ID1>-recovery-<TIME1>
-    └── tss-group-<GROUP_ID>-node-<NODE_ID2>-recovery-<TIME2>
+    ├── recovery-secrets-<nodeID1>-<time1>
+    └── recovery-secrets-<nodeID2>-<time2>
 ```
 
 * Execute the recovery command
@@ -99,12 +113,12 @@ Adding flag `--csv-file recovery/address.csv` or `--paths` are optional and alte
 
 ```
 ./cobo-mpc-recovery-tool \
-    --group-recovery-files recovery/tss-group-<GROUP_ID>-node-<NODE_ID1>-recovery-<TIME1>,recovery/tss-group-<GROUP_ID>-node-<NODE_ID2>-recovery-<TIME2> \
-    --group-id <GROUP_ID> \
+    --recovery-group-files recovery/recovery-secrets-<nodeID1>-<time1>,recovery/recovery-secrets-<nodeID2>-<time2> \
+    --group-id <groupID> \
     --show-root-private-key
 ```
 The MPC root private key and the MPC root extended public key will be reconstructed and shown in logs.
 
 * Once the execution completed, if flag `--csv-file recovery/address.csv` added, all child private keys will be saved
-under the `recovery/address-recovery-<TIME>.csv` file in plain text.
+under the `recovery/address-recovery-<time>.csv` file in plain text.
 Please make sure that all data stored securely.

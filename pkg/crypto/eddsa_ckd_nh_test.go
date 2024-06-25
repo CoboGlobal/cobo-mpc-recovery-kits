@@ -196,7 +196,7 @@ func assertKeySerialization(t *testing.T, key CKDKey, knownBase58 string) {
 	serializedBase58 := key.B58Serialize()
 	assert.Equal(t, knownBase58, serializedBase58)
 
-	unserializedBase58, err := B58Deserialize(serializedBase58)
+	unserializedBase58, err := B58DeserializeEDDSAExtendedKey(serializedBase58)
 	assert.NoError(t, err)
 	assert.Equal(t, key, unserializedBase58)
 }

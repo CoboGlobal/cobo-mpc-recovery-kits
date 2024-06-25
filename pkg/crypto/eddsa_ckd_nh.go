@@ -259,8 +259,8 @@ func (key *EDDSAExtendedKey) GetType() KeyType {
 	return EDDSAKey
 }
 
-// Deserialize a byte slice into a EDDSAExtendedKey.
-func Deserialize(data []byte) (CKDKey, error) {
+// DeserializeEDDSAExtendedKey a byte slice into a EDDSAExtendedKey.
+func DeserializeEDDSAExtendedKey(data []byte) (CKDKey, error) {
 	if len(data) != 82 {
 		return nil, ErrSerializedKeyWrongSize
 	}
@@ -296,11 +296,11 @@ func Deserialize(data []byte) (CKDKey, error) {
 	return key, nil
 }
 
-// B58Deserialize deserializes a EDDSAExtendedKey encoded in base58 encoding.
-func B58Deserialize(data string) (CKDKey, error) {
+// B58DeserializeEDDSAExtendedKey deserializes a EDDSAExtendedKey encoded in base58 encoding.
+func B58DeserializeEDDSAExtendedKey(data string) (CKDKey, error) {
 	b, err := base58Decode(data)
 	if err != nil {
 		return nil, err
 	}
-	return Deserialize(b)
+	return DeserializeEDDSAExtendedKey(b)
 }
