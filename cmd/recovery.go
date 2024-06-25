@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,7 +35,7 @@ type AddressInfo struct {
 //nolint:gocognit
 func recovery() {
 	if len(GroupFiles) == 0 {
-		log.Fatal("no group recovery files")
+		log.Fatal("no recovery group files")
 	}
 	if GroupID == "" {
 		log.Fatal("nil group ID")
@@ -45,31 +46,39 @@ func recovery() {
 	for _, groupFile := range GroupFiles {
 		_, err := os.Stat(groupFile)
 		if err != nil {
-			log.Fatalf("Group recovery file %v error: %v", groupFile, err)
+			log.Fatalf("Recovery group file %v error: %v", groupFile, err)
 		}
 
-		groupBytes, err := os.ReadFile(groupFile) //#nosec G304
+		groupBytes, err := os.ReadFile(filepath.Clean(groupFile))
 		if err != nil {
-			log.Fatalf("Read group recovery file %v failed: %v", groupFile, err)
+			log.Fatalf("Read recovery group file %v failed: %v", groupFile, err)
 		}
 
-		group := &tss.Group{}
-		err = json.Unmarshal(groupBytes, group)
-		if err != nil {
-			groups := make([]tss.Group, 0)
-			err = json.Unmarshal(groupBytes, &groups)
-			if err != nil {
-				log.Fatalf("Unmarshal group failed: %v", err)
-			}
-			for i := range groups {
-				if GroupID == groups[i].GroupInfo.ID {
-					group = &groups[i]
-					break
-				}
+		var groups []*tss.Group
+		rSecrets := tss.RecoverySecrets{RecoveryGroups: make([]*tss.Group, 0)}
+		rGroups := make([]*tss.Group, 0)
+		var rGroup tss.Group
+		if err := json.Unmarshal(groupBytes, &rSecrets); err == nil && len(rSecrets.RecoveryGroups) > 0 {
+			groups = rSecrets.RecoveryGroups
+		} else if err := json.Unmarshal(groupBytes, &rGroups); err == nil && len(rGroups) > 0 {
+			groups = rGroups
+		} else if err := json.Unmarshal(groupBytes, &rGroup); err == nil {
+			rGroups = append(rGroups, &rGroup)
+			groups = rGroups
+		} else {
+			log.Fatalf("Cannot parse recovery group file: %v", groupFile)
+		}
+
+		var group *tss.Group
+		for i := range groups {
+			if GroupID == groups[i].GroupInfo.ID {
+				group = groups[i]
+				break
 			}
 		}
-		if group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
-			log.Fatalf("Not found group %v from group recovery file", GroupID)
+
+		if group == nil || group.GroupInfo == nil || GroupID != group.GroupInfo.ID {
+			log.Fatalf("Not found group %v from recovery group file", GroupID)
 		}
 
 		if err := group.CheckGroupParams(); err != nil {
@@ -122,10 +131,16 @@ func DeriveKey(key crypto.CKDKey) error {
 		log.Fatal("no extended key input")
 	}
 	if len(Paths) > 0 {
-		for _, path := range Paths {
-			if _, err := crypto.Derive(key, path); err != nil {
-				log.Fatalf("Derive path %v error: %v", path, err)
+		for _, hdPath := range Paths {
+			dk, err := crypto.Derive(key, hdPath)
+			if err != nil {
+				log.Fatalf("Derive path %v error: %v", hdPath, err)
 			}
+			if dk.IsPrivateKey() {
+				log.Printf("Path: %v derived child private key: %v", hdPath, utils.Encode(dk.GetKey()))
+				log.Printf("Path: %v derived child extended private key: %v", hdPath, dk.String())
+			}
+			log.Printf("Path: %v derived child extended public key: %v", hdPath, dk.PublicKey().String())
 		}
 		return nil
 	}
@@ -154,12 +169,12 @@ func DeriveKey(key crypto.CKDKey) error {
 
 //nolint:gocognit
 func CSVFileDerive(key crypto.CKDKey, inputFile string, outputFile string) error {
-	readFile, err := os.Open(inputFile) //#nosec G304
+	readFile, err := os.Open(filepath.Clean(inputFile))
 	if err != nil {
 		return fmt.Errorf("open %v failed: %v", inputFile, err)
 	}
 
-	writeFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600) //#nosec G304
+	writeFile, err := os.OpenFile(filepath.Clean(outputFile), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return fmt.Errorf("create and open %v failed: %v", outputFile, err)
 	}
@@ -231,6 +246,12 @@ func CSVFileDerive(key crypto.CKDKey, inputFile string, outputFile string) error
 		if err != nil {
 			return fmt.Errorf("address %v derive error: %v", wallet.AddressInfo, err)
 		}
+		if dk.IsPrivateKey() {
+			log.Printf("Path: %v derived child private key: %v", wallet.AddressInfo.HDPath, utils.Encode(dk.GetKey()))
+			log.Printf("Path: %v derived child extended private key: %v", wallet.AddressInfo.HDPath, dk.String())
+		}
+		log.Printf("Path: %v derived child extended public key: %v", wallet.AddressInfo.HDPath, dk.PublicKey().String())
+
 		childPubKey := strings.TrimSpace(strings.ReplaceAll(wallet.AddressInfo.ChildPubKey, " ", ""))
 		if childPubKey != "" && dk.PublicKey().String() != "" && childPubKey != dk.PublicKey().String() {
 			log.Warnf("Derived child public key mismatch, address info: %v", wallet.AddressInfo)

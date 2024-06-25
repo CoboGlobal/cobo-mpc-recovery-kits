@@ -1,12 +1,12 @@
 package crypto
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
-	log "github.com/sirupsen/logrus"
+	"github.com/tyler-smith/go-bip32"
 )
 
 type KeyType int32
@@ -43,11 +43,6 @@ func Derive(key CKDKey, path string) (CKDKey, error) {
 			return nil, fmt.Errorf("derive key failed: %v", err)
 		}
 	}
-	if dk.IsPrivateKey() {
-		log.Printf("Path: %v derived child private key: %v", path, utils.Encode(dk.GetKey()))
-		log.Printf("Path: %v derived child extended private key: %v", path, dk.String())
-	}
-	log.Printf("Path: %v derived child extended public key: %v", path, dk.PublicKey().String())
 	return dk, nil
 }
 
@@ -85,4 +80,19 @@ func parsePath(path string) ([]uint32, error) {
 		indexes = append(indexes, i)
 	}
 	return indexes, nil
+}
+
+func B58Deserialize(data string) (CKDKey, error) {
+	b, err := base58Decode(data)
+	if err != nil {
+		return nil, err
+	}
+	id := b[0:4]
+	if bytes.Equal(id, EDDSAHDPrivateKeyID[:]) || bytes.Equal(id, EDDSAHDPublicKeyID[:]) {
+		return B58DeserializeEDDSAExtendedKey(data)
+	} else if bytes.Equal(id, bip32.PrivateWalletVersion) || bytes.Equal(id, bip32.PublicWalletVersion[:]) {
+		return B58DeserializeECDSAExtendedKey(data)
+	}
+
+	return nil, fmt.Errorf("error key version 0x%x", id)
 }

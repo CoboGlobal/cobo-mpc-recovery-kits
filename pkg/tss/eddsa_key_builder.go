@@ -88,11 +88,11 @@ func (g *EDDSAKeyBuilder) ReconstructPrivateKey(shares Shares, threshold int, ch
 	}
 	secret, err := shares.reconstruct(g.curve)
 	if err != nil {
-		return nil, fmt.Errorf("TSS group recovery failed to reconstruct shares: %v", err)
+		return nil, fmt.Errorf("TSS recovery group failed to reconstruct shares: %v", err)
 	}
 	privateKey, err := crypto.CreateEDDSAPrivateKey(secret)
 	if err != nil {
-		return nil, fmt.Errorf("TSS group recovery failed to reconstruct root private key: %v", err)
+		return nil, fmt.Errorf("TSS recovery group failed to reconstruct root private key: %v", err)
 	}
 
 	extPrivateKey := crypto.CreateEDDSAExtendedPrivateKey(privateKey, chainCode)

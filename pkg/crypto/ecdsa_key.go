@@ -25,9 +25,9 @@ func DecompressECDSAPubKey(pubKey []byte) (*ecdsa.PublicKey, error) {
 	return pub.ToECDSA(), nil
 }
 
-func UnmarshalPubKey(curve elliptic.Curve, pubBytes []byte) (*big.Int, *big.Int) {
-	return elliptic.Unmarshal(curve, pubBytes)
-}
+//func UnmarshalPubKey(curve elliptic.Curve, pubBytes []byte) (*big.Int, *big.Int) {
+//	return elliptic.Unmarshal(curve, pubBytes)
+//}
 
 func CreateECDSAPrivateKey(curve elliptic.Curve, d *big.Int) *ecdsa.PrivateKey {
 	prv := new(ecdsa.PrivateKey)

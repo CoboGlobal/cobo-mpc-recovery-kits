@@ -34,3 +34,11 @@ func (e *ECDSAExtendedKey) GetChainCode() []byte {
 func (e *ECDSAExtendedKey) GetType() KeyType {
 	return ECDSAKey
 }
+
+func B58DeserializeECDSAExtendedKey(data string) (CKDKey, error) {
+	key, err := bip32.B58Deserialize(data)
+	if err != nil {
+		return nil, err
+	}
+	return &ECDSAExtendedKey{key}, nil
+}

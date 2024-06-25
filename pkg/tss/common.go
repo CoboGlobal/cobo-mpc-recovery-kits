@@ -126,7 +126,7 @@ func (g *GroupInfo) reconstructRootPrivateKey(builder GroupKeyBuilder, shares Sh
 	threshold := int(g.Threshold)
 	chainCode, err := utils.Decode(g.ChainCode)
 	if err != nil {
-		return nil, fmt.Errorf("TSS group recovery failed to parse chaincode: %v", err)
+		return nil, fmt.Errorf("TSS recovery group failed to parse chaincode: %v", err)
 	}
 
 	key, err := builder.ReconstructPrivateKey(shares, threshold, chainCode)

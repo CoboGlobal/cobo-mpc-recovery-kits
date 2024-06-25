@@ -16,18 +16,21 @@ var (
 	Paths           []string
 	Csv             string
 	CsvOutputDir    string
+	RootKey         string
+	Token           string
 )
 
 func InitCmd() {
 	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(deriveCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 }
 
 func AddFlag() {
-	rootCmd.Flags().StringSliceVar(&GroupFiles, "group-recovery-files", []string{},
-		"TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2")
-	if err := rootCmd.MarkFlagRequired("group-recovery-files"); err != nil {
+	rootCmd.Flags().StringSliceVar(&GroupFiles, "recovery-group-files", []string{},
+		"TSS recovery group files, such as recovery/recovery-secrets-node1-time1,recovery/recovery-secrets-node2-time2")
+	if err := rootCmd.MarkFlagRequired("recovery-group-files"); err != nil {
 		log.Fatal(err)
 	}
 	rootCmd.Flags().StringVar(&GroupID, "group-id", "", "recovery group id")
@@ -41,20 +44,27 @@ func AddFlag() {
 	rootCmd.Flags().StringVar(&CsvOutputDir, "csv-output-dir", "recovery",
 		"address csv output dir, derive keys file output in this directory")
 
-	verifyCmd.Flags().StringSliceVar(&GroupFiles, "group-recovery-files", []string{},
-		"TSS group recovery files, such as recovery/tss-group-id-node-1-time1,recovery/tss-group-id-node-2-time2")
-	if err := verifyCmd.MarkFlagRequired("group-recovery-files"); err != nil {
+	verifyCmd.Flags().StringSliceVar(&GroupFiles, "recovery-group-files", []string{},
+		"TSS recovery group files, such as recovery/recovery-secrets-node1-time1,recovery/recovery-secrets-node2-time2")
+	if err := verifyCmd.MarkFlagRequired("recovery-group-files"); err != nil {
 		log.Fatal(err)
 	}
 	verifyCmd.Flags().StringVar(&GroupID, "group-id", "", "recovery group id")
 	if err := verifyCmd.MarkFlagRequired("group-id"); err != nil {
 		log.Fatal(err)
 	}
+
+	deriveCmd.Flags().StringVar(&RootKey, "key", "", "extended root key")
+	deriveCmd.Flags().StringSliceVar(&Paths, "paths", []string{}, "key HD derivation paths")
+	if err := deriveCmd.MarkFlagRequired("key"); err != nil {
+		log.Fatal(err)
+	}
+	deriveCmd.Flags().StringVar(&Token, "token", "", "token")
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "cobo-mpc-recovery-tool",
-	Short: "cobo-mpc-recovery-tool to reconstruct root private key by TSS group recovery files and derive child keys",
+	Short: "Reconstruct root private key by TSS recovery group files and derive child keys",
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Version: " + version.TextVersion() + "\n")
