@@ -1,0 +1,42 @@
+// Copyright (c) 2015-2016 The Decred developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
+package edwards
+
+import (
+	"math/big"
+
+	"filippo.io/edwards25519/field"
+)
+
+var (
+	// zero through eight are big.Int numbers useful in
+	// elliptical curve math.
+	zero  = new(big.Int).SetInt64(0)
+	one   = new(big.Int).SetInt64(1)
+	two   = new(big.Int).SetInt64(2)
+	three = new(big.Int).SetInt64(3)
+	four  = new(big.Int).SetInt64(4)
+	eight = new(big.Int).SetInt64(8)
+
+	// fieldIntSize is the size of a field element encoded
+	// as bytes.
+	fieldIntSize = 32
+)
+
+// feD is a constant in the curve equation.
+var feD, _ = new(field.Element).SetBytes([]byte{
+	0xa3, 0x78, 0x59, 0x13, 0xca, 0x4d, 0xeb, 0x75,
+	0xab, 0xd8, 0x41, 0x41, 0x4d, 0x0a, 0x70, 0x00,
+	0x98, 0xe8, 0x79, 0x77, 0x79, 0x40, 0xc7, 0x8c,
+	0x73, 0xfe, 0x6f, 0x2b, 0xee, 0x6c, 0x03, 0x52})
+
+var feOne = new(field.Element).One()
+
+// sqrtM1 is 2^((p-1)/4), which squared is equal to -1 by Euler's Criterion.
+var sqrtM1, _ = new(field.Element).SetBytes([]byte{
+	0xb0, 0xa0, 0x0e, 0x4a, 0x27, 0x1b, 0xee, 0xc4,
+	0x78, 0xe4, 0x2f, 0xad, 0x06, 0x18, 0x43, 0x2f,
+	0xa7, 0xd7, 0xfb, 0x3d, 0x99, 0x00, 0x4d, 0x2b,
+	0x0b, 0xdf, 0xc1, 0x4f, 0x80, 0x24, 0x83, 0x2b})
