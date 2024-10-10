@@ -6,7 +6,7 @@ toolchain go1.21.5
 
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e
-	github.com/btcsuite/btcd v0.24.0
+	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/decred/dcrd/dcrec/edwards/v2 v2.0.2
