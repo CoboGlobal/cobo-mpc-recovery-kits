@@ -10,7 +10,7 @@ import (
 	"math/big"
 
 	"github.com/FactomProject/basen"
-	//nolint:gosec,staticcheck // G507: RIPEMD160 is Required by BIP32 standard
+	// #nosec G507 -- RIPEMD160 is required by BIP32 standard
 	"golang.org/x/crypto/ripemd160"
 )
 
