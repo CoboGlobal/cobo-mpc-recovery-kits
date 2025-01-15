@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/tss"
-	"github.com/cobo/cobo-mpc-recovery-kits/version"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/cipher"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/tss"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

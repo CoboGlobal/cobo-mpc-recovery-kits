@@ -10,7 +10,8 @@ import (
 	"math/big"
 
 	"github.com/FactomProject/basen"
-	"golang.org/x/crypto/ripemd160" //nolint:staticcheck
+	// #nosec G507 -- RIPEMD160 is required by BIP32 standard
+	"golang.org/x/crypto/ripemd160"
 )
 
 // BitcoinBase58Encoding is the encoding used for bitcoin addresses.
@@ -43,7 +44,7 @@ func hashDoubleSha256(data []byte) ([]byte, error) {
 }
 
 func hashRipeMD160(data []byte) ([]byte, error) {
-	hasher := ripemd160.New()
+	hasher := ripemd160.New() // #nosec G406 -- Required by BIP32 standard
 	_, err := io.WriteString(hasher, string(data))
 	if err != nil {
 		return nil, err

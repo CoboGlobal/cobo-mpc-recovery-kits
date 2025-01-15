@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/version"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

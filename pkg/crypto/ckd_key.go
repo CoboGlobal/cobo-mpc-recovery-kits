@@ -65,13 +65,13 @@ func parsePath(path string) ([]uint32, error) {
 		}
 		var i uint32
 		if strings.HasSuffix(segment, "'") || strings.HasSuffix(segment, "H") {
-			num, err := strconv.Atoi(segment[:len(segment)-1])
+			num, err := strconv.ParseUint(segment[:len(segment)-1], 10, 31)
 			if err != nil {
 				return nil, err
 			}
 			i = 1<<31 + uint32(num)
 		} else {
-			num, err := strconv.Atoi(segment)
+			num, err := strconv.ParseUint(segment, 10, 32)
 			if err != nil {
 				return nil, err
 			}
