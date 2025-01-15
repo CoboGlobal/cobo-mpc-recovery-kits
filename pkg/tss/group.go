@@ -3,8 +3,8 @@ package tss
 import (
 	"fmt"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/cipher"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/cipher"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/crypto"
 )
 
 const (

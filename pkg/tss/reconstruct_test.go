@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/crypto"
 )
 
 func TestReconstructPrivateKey(t *testing.T) {

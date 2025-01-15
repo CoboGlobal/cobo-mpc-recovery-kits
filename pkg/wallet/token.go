@@ -3,7 +3,7 @@ package wallet
 import (
 	"fmt"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/crypto"
 )
 
 type Token struct {

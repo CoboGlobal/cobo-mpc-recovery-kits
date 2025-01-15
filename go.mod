@@ -1,4 +1,4 @@
-module github.com/cobo/cobo-mpc-recovery-kits
+module github.com/CoboGlobal/cobo-mpc-recovery-kits
 
 go 1.23.4
 

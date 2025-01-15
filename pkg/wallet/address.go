@@ -3,11 +3,11 @@ package wallet
 import (
 	"fmt"
 
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/crypto"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
 	gethCrypto "github.com/ethereum/go-ethereum/crypto"
 )
 

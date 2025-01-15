@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/crypto"
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/wallet"
-	"github.com/cobo/cobo-mpc-recovery-kits/version"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/crypto"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/wallet"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/version"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

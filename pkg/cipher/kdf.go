@@ -4,7 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/utils"
 	"golang.org/x/crypto/pbkdf2"
 )
 

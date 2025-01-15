@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/version"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/version"
 	"github.com/spf13/cobra"
 )
 

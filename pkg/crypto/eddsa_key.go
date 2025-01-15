@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/utils"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 )
 

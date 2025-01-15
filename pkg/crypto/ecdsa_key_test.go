@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/cobo/cobo-mpc-recovery-kits/pkg/utils"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/utils"
 )
 
 func TestCompressECDSAPublicKey(t *testing.T) {
