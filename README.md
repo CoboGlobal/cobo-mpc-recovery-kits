@@ -9,7 +9,7 @@ Binary archives are published at https://github.com/CoboCustody/cobo-mpc-recover
 
 Building binary from the source in local environment, instead of using published binary archives
 
-* Go 1.21 is required. Manually install Go, please [click here](https://go.dev/doc/install)
+* Go 1.23 is required. Manually install Go, please [click here](https://go.dev/doc/install)
 
 * Clone the repository:
 
