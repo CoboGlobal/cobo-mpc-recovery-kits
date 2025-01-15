@@ -101,7 +101,12 @@ func (g *Group) CheckGroupParams() error {
 	if g.GroupInfo.Threshold < 1 {
 		return fmt.Errorf("group param threshold not supported")
 	}
-	if g.GroupInfo.Threshold > int32(len(g.GroupInfo.Participants)) {
+	const maxParticipants = 1000
+	participantsLen := len(g.GroupInfo.Participants)
+	if participantsLen > maxParticipants {
+		return fmt.Errorf("participants count %d exceeds maximum allowed value %d", participantsLen, maxParticipants)
+	}
+	if g.GroupInfo.Threshold > int32(participantsLen) {
 		return fmt.Errorf("group param participants less than threshold")
 	}
 
