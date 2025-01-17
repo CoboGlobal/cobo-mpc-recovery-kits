@@ -1,6 +1,6 @@
 module github.com/CoboGlobal/cobo-mpc-recovery-kits
 
-go 1.23.4
+go 1.23
 
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e
