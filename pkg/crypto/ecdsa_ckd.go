@@ -1,6 +1,6 @@
 package crypto
 
-import "github.com/tyler-smith/go-bip32"
+import "github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/bip32"
 
 type ECDSAExtendedKey struct {
 	*bip32.Key
