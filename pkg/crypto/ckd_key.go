@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tyler-smith/go-bip32"
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/bip32"
 )
 
 type KeyType int32

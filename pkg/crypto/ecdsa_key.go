@@ -5,8 +5,8 @@ import (
 	"crypto/elliptic"
 	"math/big"
 
+	"github.com/CoboGlobal/cobo-mpc-recovery-kits/pkg/bip32"
 	secp "github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/tyler-smith/go-bip32"
 )
 
 func CompressECDSAPubKey(pubKey *ecdsa.PublicKey) []byte {
